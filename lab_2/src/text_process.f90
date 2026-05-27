@@ -1,152 +1,107 @@
-module Text_Process
-   use Environment
-   use Text_IO
+module text_processing
+   use environment
 
    implicit none
+   private
+
+   type, public :: text_node
+      character(:, CH_), allocatable :: line
+      type(text_node),   allocatable :: next
+   end type text_node
+
+   type, public :: dir_node
+      character(1, CH_)            :: dir
+      type(dir_node), allocatable  :: next
+   end type dir_node
+
+   character(1, CH_), parameter :: CHAR_F = 'f'
+   character(1, CH_), parameter :: CHAR_F_BIG = 'F'
+   character(1, CH_), parameter :: CHAR_B = 'b'
+   character(1, CH_), parameter :: CHAR_B_BIG = 'B'
+
+   public :: text_size, get_line, paginate
 
 contains
+  !рекурсивно вычисляет количество элементов в связанном списке текста
+   pure recursive integer(I_) function text_size(head) result(n)
+      type(text_node), intent(in) :: head
 
-   ! Функция для вычисления длины списка.
-   recursive function Get_List_Length(head) result(len)
-      type(TextLine), pointer, intent(in) :: head
-      integer                             :: len
-
-      if (.not. associated(head)) then
-         len = 0
+      if (allocated(head%next)) then
+         n = 1 + text_size(head%next)
       else
-         len = 1 + Get_List_Length(head%next)
+         n = 1
       end if
-   end function Get_List_Length
+   end function text_size
 
-   ! Функция получения n-го узла (1-based).
-   recursive function Get_Nth_Node(head, n) result(node)
-      type(TextLine), pointer, intent(in) :: head
-      integer, intent(in)                 :: n
-      type(TextLine), pointer             :: node
+   !возвращает строку по номеру
+   pure recursive function get_line(head, k) result(res)
+      type(text_node),  intent(in) :: head
+      integer(I_),      intent(in) :: k
+      character(:, CH_), allocatable :: res
 
-      if (n <= 0 .or. .not. associated(head)) then
-         node => null()
-      else if (n == 1) then
-         node => head
-      else
-         node => Get_Nth_Node(head%next, n-1)
-      end if
-   end function Get_Nth_Node
-
-   ! Функция для создания среза списка (новый список!).
-   recursive function Make_Slice(head, count) result(slice)
-      type(TextLine), pointer, intent(in) :: head
-      integer, intent(in)                 :: count
-      type(TextLine), pointer             :: slice
-
-      if (count <= 0 .or. .not. associated(head)) then
-         slice => null()
-      else
-         allocate(slice)
-         slice%String = head%String
-         slice%Next => Make_Slice(head%next, count-1)
-      end if
-   end function Make_Slice
-
-   ! Преобразование списка строк в одну строку с пробелами.
-   recursive function List_To_String(head) result(res_str)
-      type(TextLine), pointer, intent(in) :: head
-      character(:, CH_), allocatable      :: res_str
-      character(:, CH_), allocatable      :: tail_str
-
-      if (.not. associated(head)) then
-         res_str = ""
-      else
-         tail_str = List_To_String(head%next)
-         if (len(tail_str) > 0) then
-            res_str = Trim(head%String) // CH__" " // tail_str
+      if (k == 1) then
+         if (allocated(head%line)) then
+            res = head%line
          else
-            res_str = Trim(head%String)
+            allocate(character(0, CH_) :: res)
          end if
-      end if
-   end function List_To_String
-
-   ! Добавление в конец списка.
-   recursive function Append_Result(accumulator, new_string) result(res)
-      type(TextLine), pointer, intent(in) :: accumulator
-      character(*, CH_), intent(in)       :: new_string   ! Используем ассумированную длину
-      type(TextLine), pointer             :: res
-
-      if (.not. associated(accumulator)) then
-         allocate(res)
-         res%String = new_string
-         res%Next => null()
+      else if (allocated(head%next)) then
+         res = get_line(head%next, k - 1)
       else
-         allocate(res)
-         res%String = accumulator%String
-         res%Next => Append_Result(accumulator%Next, new_string)
+         allocate(character(0, CH_) :: res)
       end if
-   end function Append_Result
+   end function get_line
 
-   ! Разворот списка (для правильного порядка результатов).
-   recursive function Reverse_List(head) result(reversed)
-      type(TextLine), pointer, intent(in) :: head
-      type(TextLine), pointer             :: reversed
+   !вычисляет следующую позицию по команде
+   pure integer(I_) function next_pos(pos, dir, win_size, total)
+      integer(I_),      intent(in) :: pos, win_size, total
+      character(1, CH_), intent(in) :: dir
 
-      if (.not. associated(head)) then
-         reversed => null()
-      else
-         reversed => Append_Result(Reverse_List(head%Next), head%String)
-      end if
-   end function Reverse_List
-
-   ! Основная рекурсия для пролистывания.
-   recursive function Paginate(head, commands, n, current_pos, accumulator) result(res)
-      type(TextLine), pointer, intent(in)     :: head
-      type(Command), pointer, intent(in)      :: commands
-      integer, intent(in)                     :: n
-      integer, intent(in)                     :: current_pos
-      type(TextLine), pointer, intent(in)     :: accumulator
-      type(TextLine), pointer                 :: res
-
-      type(TextLine), pointer :: frame, new_accumulator
-      integer                 :: new_pos, total_len
-      character(:, CH_), allocatable :: frame_text
-      character(1)            :: cmd_char
-
-      if (.not. associated(commands)) then
-         ! Базовый случай: разворачиваем аккумулятор для правильного порядка.
-         res => Reverse_List(accumulator)
-      else
-         ! Вычисляем новую позицию на основе команды.
-         cmd_char = commands%Cmd
-         if (cmd_char == 'F' .or. cmd_char == 'f') then
-            new_pos = current_pos + n
-         else if (cmd_char == 'B' .or. cmd_char == 'b') then
-            new_pos = max(1, current_pos - n)
+      if (dir == CHAR_F .or. dir == CHAR_F_BIG) then
+         if (pos + win_size <= total) then
+            next_pos = pos + win_size
          else
-            new_pos = current_pos
+            next_pos = total - win_size + 1
+            if (next_pos < 1) next_pos = 1
          end if
+      else if (dir == CHAR_B .or. dir == CHAR_B_BIG) then
+         next_pos = max(pos - win_size, 1)
+      else
+         next_pos = pos
+      end if
+   end function next_pos
 
-         ! Получаем кадр, начиная с новой позиции.
-         total_len = Get_List_Length(head)
+   !рекурсивная функция пролистывания
+   recursive function paginate(text, dirs, win_size, pos, total) result(actions)
+      type(text_node), allocatable, intent(in) :: text
+      type(dir_node),  allocatable, intent(in) :: dirs
+      integer(I_),                   intent(in) :: win_size, pos, total, i
+      character(:, CH_), allocatable :: actions(:)
+      character(:, CH_), allocatable :: tail_actions(:), window_lines(:)
+      integer(I_) :: new_pos, end_pos, n_lines, n
+
+      !вычисляем последнюю строку текущего окна
+      end_pos = min(pos + win_size - 1, total)
+      n_lines = end_pos - pos + 1
+
+      if (.not. allocated(dirs)) then
+         allocate(character(100, CH_) :: actions(n_lines))
+         actions = [(get_line(text, pos + i - 1), i = 1, n_lines)]
+      else
+         new_pos = next_pos(pos, dirs%dir, win_size, total)
          
-         if (new_pos > total_len) then
-            frame => null()
-         else
-            frame => Make_Slice(Get_Nth_Node(head, new_pos), n)
-         end if
-
-         ! Преобразуем кадр в строку для вывода.
-         frame_text = List_To_String(frame)
+         tail_actions = paginate(text, dirs%next, win_size, new_pos, total)
          
-         ! Добавляем в аккумулятор (накапливаем в обратном порядке).
-         if (len(frame_text) > 0) then
-            allocate(new_accumulator)
-            new_accumulator%String = frame_text
-            new_accumulator%Next => accumulator
-         else
-            new_accumulator => accumulator
-         end if
-
-         ! Рекурсивный вызов с новыми параметрами.
-         res => Paginate(head, commands%Next, n, new_pos, new_accumulator)
+         allocate(character(100, CH_) :: window_lines(n_lines))
+         window_lines = [(get_line(text, pos + i - 1), i = 1, n_lines)]
+         
+         n = n_lines + 1 + size(tail_actions)
+         allocate(character(100, CH_) :: actions(n))
+         
+         actions(1:n_lines) = window_lines
+         actions(n_lines + 1) = dirs%dir
+         actions(n_lines + 2:) = tail_actions
       end if
-   end function Paginate
+   end function paginate
 
-end module Text_Process
+end module text_processing

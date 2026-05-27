@@ -1,4 +1,5 @@
-﻿!mod$ v1 sum:c44d789aa54bc7e3
+﻿!mod$ v1 sum:544e28d9c4d01014
+!need$ 8ab38fea7e191aea n text_processing
 !need$ 5cbba2cdaa980ab0 n environment
 module text_io
 use environment,only:event_type
@@ -96,42 +97,149 @@ use environment,only:operator(//)
 use environment,only:int_plus_string
 use environment,only:string_plus_int
 use environment,only:handle_io_status
-type::textline
-character(:,4),allocatable::string
-type(textline),pointer::next=>NULL()
-end type
-intrinsic::null
-type::command
-character(1_4,1)::cmd
-type(command),pointer::next=>NULL()
-end type
+use text_processing,only:text_node
+use text_processing,only:dir_node
+use text_processing,only:text_size
+use text_processing,only:get_line
+use text_processing,only:paginate
+private::event_type
+private::notify_type
+private::lock_type
+private::team_type
+private::atomic_int_kind
+private::atomic_logical_kind
+private::compiler_options
+private::compiler_version
+private::selectedint8
+private::selectedint16
+private::selectedint32
+private::selectedint64
+private::selectedint128
+private::safeint8
+private::safeint16
+private::safeint32
+private::safeint64
+private::safeint128
+private::int8
+private::int16
+private::int32
+private::int64
+private::int128
+private::selecteduint8
+private::selecteduint16
+private::selecteduint32
+private::selecteduint64
+private::selecteduint128
+private::safeuint8
+private::safeuint16
+private::safeuint32
+private::safeuint64
+private::safeuint128
+private::uint8
+private::uint16
+private::uint32
+private::uint64
+private::uint128
+private::logical8
+private::logical16
+private::logical32
+private::logical64
+private::selectedreal16
+private::selectedbfloat16
+private::selectedreal32
+private::selectedreal64
+private::selectedreal80
+private::selectedreal64x2
+private::selectedreal128
+private::safereal16
+private::safebfloat16
+private::safereal32
+private::safereal64
+private::safereal80
+private::safereal64x2
+private::safereal128
+private::real16
+private::bfloat16
+private::real32
+private::real64
+private::real80
+private::real64x2
+private::real128
+private::integer_kinds
+private::real_kinds
+private::logical_kinds
+private::character_kinds
+private::current_team
+private::initial_team
+private::parent_team
+private::character_storage_size
+private::file_storage_size
+private::numeric_storage_size
+private::output_unit
+private::input_unit
+private::error_unit
+private::iostat_end
+private::iostat_eor
+private::iostat_inquire_internal_unit
+private::stat_failed_image
+private::stat_locked
+private::stat_locked_other_image
+private::stat_stopped_image
+private::stat_unlocked
+private::stat_unlocked_failed_image
+private::i_
+private::r_
+private::c_
+private::ch_
+private::selected_char_kind
+private::e_
+private::operator(//)
+private::int_plus_string
+private::string_plus_int
+private::handle_io_status
+private::text_node
+private::dir_node
+private::text_size
+private::get_line
+private::paginate
+private::read_win_size
+private::read_text_list
+private::read_dir_list
+private::write_dir_list
+private::write_text_list
 contains
-function read_text(inputfile) result(text)
-character(*,1),intent(in)::inputfile
-type(textline),pointer::text
+subroutine read_all_data(file1,file2,text_list,dir_list,win_size)
+character(*,1),intent(in)::file1
+character(*,1),intent(in)::file2
+type(text_node),allocatable,intent(out)::text_list
+type(dir_node),allocatable,intent(out)::dir_list
+integer(4),intent(out)::win_size
 end
-recursive function read_text_line(in) result(text)
-integer(4),intent(in)::in
-type(textline),pointer::text
+subroutine read_win_size(in_unit,win_size)
+integer(4),intent(in)::in_unit
+integer(4),intent(out)::win_size
 end
-function read_commands(inputfile) result(commands)
-character(*,1),intent(in)::inputfile
-type(command),pointer::commands
+recursive subroutine read_text_list(in_unit,head)
+integer(4),intent(in)::in_unit
+type(text_node),allocatable::head
 end
-recursive function read_command_line(in) result(commands)
-integer(4),intent(in)::in
-type(command),pointer::commands
+recursive subroutine read_dir_list(in_unit,head)
+integer(4),intent(in)::in_unit
+type(dir_node),allocatable::head
 end
-function read_n(inputfile) result(n)
-character(*,1),intent(in)::inputfile
-integer(4)::n
+subroutine write_full_output(fileout,text_list,dir_list,win_size,actions)
+character(*,1),intent(in)::fileout
+type(text_node),allocatable,intent(in)::text_list
+type(dir_node),allocatable,intent(in)::dir_list
+integer(4),intent(in)::win_size
+character(:,4),allocatable,intent(in)::actions(:)
 end
-subroutine output_text(outputfile,text)
-character(*,1),intent(in)::outputfile
-type(textline),intent(in)::text
+recursive subroutine write_dir_list(out_unit,head)
+integer(4),intent(in)::out_unit
+type(dir_node),allocatable,intent(in)::head
 end
-recursive subroutine output_text_line(out,text)
-integer(4),intent(in)::out
-type(textline),intent(in)::text
+recursive subroutine write_text_list(out_unit,head)
+integer(4),intent(in)::out_unit
+type(text_node),allocatable,intent(in)::head
 end
 end

@@ -1,7 +1,6 @@
-﻿!mod$ v1 sum:3ffe7858b6d3de20
-!need$ c44d789aa54bc7e3 n text_io
+﻿!mod$ v1 sum:8ab38fea7e191aea
 !need$ 5cbba2cdaa980ab0 n environment
-module text_process
+module text_processing
 use environment,only:event_type
 use environment,only:notify_type
 use environment,only:lock_type
@@ -97,49 +96,137 @@ use environment,only:operator(//)
 use environment,only:int_plus_string
 use environment,only:string_plus_int
 use environment,only:handle_io_status
-use text_io,only:textline
-use text_io,only:command
-use text_io,only:read_text
-use text_io,only:read_text_line
-use text_io,only:read_commands
-use text_io,only:read_command_line
-use text_io,only:read_n
-use text_io,only:output_text
-use text_io,only:output_text_line
+private::event_type
+private::notify_type
+private::lock_type
+private::team_type
+private::atomic_int_kind
+private::atomic_logical_kind
+private::compiler_options
+private::compiler_version
+private::selectedint8
+private::selectedint16
+private::selectedint32
+private::selectedint64
+private::selectedint128
+private::safeint8
+private::safeint16
+private::safeint32
+private::safeint64
+private::safeint128
+private::int8
+private::int16
+private::int32
+private::int64
+private::int128
+private::selecteduint8
+private::selecteduint16
+private::selecteduint32
+private::selecteduint64
+private::selecteduint128
+private::safeuint8
+private::safeuint16
+private::safeuint32
+private::safeuint64
+private::safeuint128
+private::uint8
+private::uint16
+private::uint32
+private::uint64
+private::uint128
+private::logical8
+private::logical16
+private::logical32
+private::logical64
+private::selectedreal16
+private::selectedbfloat16
+private::selectedreal32
+private::selectedreal64
+private::selectedreal80
+private::selectedreal64x2
+private::selectedreal128
+private::safereal16
+private::safebfloat16
+private::safereal32
+private::safereal64
+private::safereal80
+private::safereal64x2
+private::safereal128
+private::real16
+private::bfloat16
+private::real32
+private::real64
+private::real80
+private::real64x2
+private::real128
+private::integer_kinds
+private::real_kinds
+private::logical_kinds
+private::character_kinds
+private::current_team
+private::initial_team
+private::parent_team
+private::character_storage_size
+private::file_storage_size
+private::numeric_storage_size
+private::output_unit
+private::input_unit
+private::error_unit
+private::iostat_end
+private::iostat_eor
+private::iostat_inquire_internal_unit
+private::stat_failed_image
+private::stat_locked
+private::stat_locked_other_image
+private::stat_stopped_image
+private::stat_unlocked
+private::stat_unlocked_failed_image
+private::i_
+private::r_
+private::c_
+private::ch_
+private::selected_char_kind
+private::e_
+private::operator(//)
+private::int_plus_string
+private::string_plus_int
+private::handle_io_status
+type::text_node
+character(:,4),allocatable::line
+type(text_node),allocatable::next
+end type
+type::dir_node
+character(1_4,4)::dir
+type(dir_node),allocatable::next
+end type
+character(1_4,4),parameter,private::char_f=4_"f"
+character(1_4,4),parameter,private::char_f_big=4_"F"
+character(1_4,4),parameter,private::char_b=4_"b"
+character(1_4,4),parameter,private::char_b_big=4_"B"
+private::next_pos
 contains
-recursive function get_list_length(head) result(len)
-type(textline),intent(in),pointer::head
-integer(4)::len
+pure recursive function text_size(head) result(n)
+type(text_node),intent(in)::head
+integer(4)::n
 end
-recursive function get_nth_node(head,n) result(node)
-type(textline),intent(in),pointer::head
-integer(4),intent(in)::n
-type(textline),pointer::node
+pure recursive function get_line(head,k) result(res)
+type(text_node),intent(in)::head
+integer(4),intent(in)::k
+character(:,4),allocatable::res
 end
-recursive function make_slice(head,count) result(slice)
-type(textline),intent(in),pointer::head
-integer(4),intent(in)::count
-type(textline),pointer::slice
+pure function next_pos(pos,dir,win_size,total)
+integer(4),intent(in)::pos
+character(1_4,4),intent(in)::dir
+integer(4),intent(in)::win_size
+integer(4),intent(in)::total
+integer(4)::next_pos
 end
-recursive function list_to_string(head) result(res_str)
-type(textline),intent(in),pointer::head
-character(:,4),allocatable::res_str
-end
-recursive function append_result(accumulator,new_string) result(res)
-type(textline),intent(in),pointer::accumulator
-character(*,4),intent(in)::new_string
-type(textline),pointer::res
-end
-recursive function reverse_list(head) result(reversed)
-type(textline),intent(in),pointer::head
-type(textline),pointer::reversed
-end
-recursive function paginate(head,commands,n,current_pos,accumulator) result(res)
-type(textline),intent(in),pointer::head
-type(command),intent(in),pointer::commands
-integer(4),intent(in)::n
-integer(4),intent(in)::current_pos
-type(textline),intent(in),pointer::accumulator
-type(textline),pointer::res
+recursive function paginate(text,dirs,win_size,pos,total) result(actions)
+type(text_node),allocatable,intent(in)::text
+type(dir_node),allocatable,intent(in)::dirs
+integer(4),intent(in)::win_size
+integer(4),intent(in)::pos
+integer(4),intent(in)::total
+character(:,4),allocatable::actions(:)
 end
 end

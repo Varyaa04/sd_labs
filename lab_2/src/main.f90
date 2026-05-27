@@ -1,47 +1,26 @@
-program Lab_2
-   use Environment
-   use Text_Process
-   use Text_IO
+program main
+   use environment
+   use text_processing
+   use text_io
 
    implicit none
-   character(:), allocatable :: TextFile, CommandFile, OutputFile
 
-   type(TextLine), pointer   :: SourceText => Null()   ! Исходный текст.
-   type(Command), pointer    :: Commands   => Null()   ! Список команд.
-   type(TextLine), pointer   :: Result     => Null()   ! Результат пролистывания.
-   integer                   :: N                       ! Размер листа.
+   character(*), parameter :: File1   = "../data/text.txt"
+   character(*), parameter :: File2   = "../data/direction.txt"
+   character(*), parameter :: FileOut = "output.txt"  
 
-   ! Имена файлов.
-   TextFile    = "../data/text.txt"
-   CommandFile = "../data/direction.txt"
-   OutputFile  = "result.txt"
+   type(text_node), allocatable :: text_list
+   type(dir_node),  allocatable :: dir_list
+   character(:, CH_), allocatable :: actions(:)
+   integer(I_) :: win_size, total_len
 
-   ! Чтение исходного текста.
-   SourceText => Read_Text(TextFile)
-   if (.not. associated(SourceText)) then
-      write(ERROR_UNIT, '(a)') "Error: Could not read source text file."
-      stop
+   call read_all_data(File1, File2, text_list, dir_list, win_size)
+
+   if (allocated(text_list) .and. allocated(dir_list)) then
+      total_len = text_size(text_list)
+      actions = paginate(text_list, dir_list, win_size, 1, total_len)
    end if
 
-   ! Чтение размера листа N.
-   N = Read_N(CommandFile)
+   call write_full_output(FileOut, text_list, dir_list, win_size, actions)
 
-   ! Чтение команд.
-   Commands => Read_Commands(CommandFile)
-   if (.not. associated(Commands)) then
-      write(ERROR_UNIT, '(a)') "Error: Could not read commands file."
-      stop
-   end if
-
-   ! Обработка: пролистывание текста.
-   ! Начинаем с позиции 1.
-   Result => Paginate(SourceText, Commands, N, 1, null())
-
-   ! Вывод результата.
-   if (associated(Result)) then
-      call Output_Text(OutputFile, Result)
-   else
-      write(ERROR_UNIT, '(a)') "Warning: No result to output."
-   end if
-
-end program Lab_2
+end program main

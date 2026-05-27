@@ -1,113 +1,135 @@
-module Text_IO
-   use Environment
-   implicit none
-   
-   ! Структура данных для хранения строки текста.
-   type TextLine
-      character(:, CH_), allocatable   :: String
-      type(TextLine), pointer          :: Next => Null()
-   end type TextLine
+module text_io
+   use environment
+   use text_processing
 
-   ! Структура данных для хранения команд (F/B).
-   type Command
-      character(1)                     :: Cmd   ! Используем default KIND
-      type(Command), pointer           :: Next => Null()
-   end type Command
+   implicit none
+   private
+
+   public :: read_all_data, write_full_output
 
 contains
-   ! Чтение текста из файла.
-   function Read_Text(InputFile) result(Text)
-      type(TextLine), pointer  :: Text
-      character(*), intent(in) :: InputFile
-      integer                  :: In
+!читаем все входные данные из двух файлов и возвращает списки и размер окна
+   subroutine read_all_data(file1, file2, text_list, dir_list, win_size)
+      character(*),                    intent(in)  :: file1, file2
+      type(text_node), allocatable,    intent(out) :: text_list
+      type(dir_node),  allocatable,    intent(out) :: dir_list
+      integer(I_),                     intent(out) :: win_size
+      integer :: in1, in2, ios
+
+      open (newunit=in1, file=file1, encoding=E_, iostat=ios, action='read')
+      if (ios /= 0) stop "Error opening text.txt"
       
-      open (file=InputFile, encoding=E_, newunit=In)
-         Text => Read_Text_Line(In)
-      close (In)
-   end function Read_Text
+      open (newunit=in2, file=file2, encoding=E_, iostat=ios, action='read')
+      if (ios /= 0) stop "Error opening direction.txt"
 
-   ! Чтение строки текста (рекурсивно).
-   recursive function Read_Text_Line(In) result(Text)
-      type(TextLine), pointer  :: Text
-      integer, intent(in)      :: In
-      integer, parameter       :: max_len = 1024
-      character(max_len, CH_)  :: string
-      integer                  :: IO
+      call read_win_size(in2, win_size)
+      call read_text_list(in1, text_list)
+      call read_dir_list(in2, dir_list)
 
-      read (In, "(a)", iostat=IO) string
-      call Handle_IO_Status(IO, "reading line from text file")
-      if (IO == 0) then
-         allocate (Text)
-         Text%String = Trim(string)
-         Text%Next => Read_Text_Line(In)
-      else
-         Text => Null()
+      close (in1)
+      close (in2)
+   end subroutine read_all_data
+
+   !считываем размер окна из открытого файла
+   subroutine read_win_size(in_unit, win_size)
+      integer,      intent(in)  :: in_unit
+      integer(I_),  intent(out) :: win_size
+      integer :: ios
+
+      read(in_unit, *, iostat=ios) win_size
+      call Handle_IO_status(ios, "reading window size")
+   end subroutine read_win_size
+
+   !рекурсивно считываем строки текста из файла в связанный список
+   recursive subroutine read_text_list(in_unit, head)
+      integer,                  intent(in)  :: in_unit
+      type(text_node), allocatable          :: head
+      character(1024, CH_) :: buffer
+      integer :: ios
+
+      read(in_unit, '(a)', iostat=ios) buffer
+      if (ios == 0) then
+         allocate(head)
+         head%line = buffer
+         call read_text_list(in_unit, head%next)
       end if
-   end function Read_Text_Line
+   end subroutine read_text_list
 
-   ! Чтение команд из файла.
-   function Read_Commands(InputFile) result(Commands)
-      type(Command), pointer   :: Commands
-      character(*), intent(in) :: InputFile
-      integer                  :: In
-      
-      open (file=InputFile, encoding=E_, newunit=In)
-         Commands => Read_Command_Line(In)
-      close (In)
-   end function Read_Commands
+   !рекурсивно считываем команды направления из файла в связанный список
+   recursive subroutine read_dir_list(in_unit, head)
+      integer,                 intent(in)  :: in_unit
+      type(dir_node), allocatable          :: head
+      character(1, CH_) :: cmd
+      integer :: ios
 
-   ! Чтение одной команды (рекурсивно).
-   recursive function Read_Command_Line(In) result(Commands)
-      type(Command), pointer  :: Commands
-      integer, intent(in)     :: In
-      character(1)            :: cmd_char
-      integer                 :: IO
-
-      read (In, *, iostat=IO) cmd_char
-      call Handle_IO_Status(IO, "reading command from file")
-      if (IO == 0) then
-         allocate (Commands)
-         Commands%Cmd = cmd_char
-         Commands%Next => Read_Command_Line(In)
-      else
-         Commands => Null()
+      read(in_unit, '(a)', iostat=ios) cmd
+      if (ios == 0) then
+         allocate(head)
+         head%dir = cmd
+         call read_dir_list(in_unit, head%next)
       end if
-   end function Read_Command_Line
+   end subroutine read_dir_list
 
-   ! Чтение размера листа N из файла команд (первая строка).
-   function Read_N(InputFile) result(N)
-      integer                  :: N
-      character(*), intent(in) :: InputFile
-      integer                  :: In
-      integer                  :: IO
+   !вывод всего
+   subroutine write_full_output(fileout, text_list, dir_list, win_size, actions)
+      character(*),                      intent(in) :: fileout
+      type(text_node), allocatable,      intent(in) :: text_list
+      type(dir_node),  allocatable,      intent(in) :: dir_list
+      integer(I_),                       intent(in) :: win_size
+      character(:, CH_), allocatable,    intent(in) :: actions(:)
+      integer :: out_unit, ios, i
 
-      open (file=InputFile, encoding=E_, newunit=In)
-         read (In, *, iostat=IO) N
-         call Handle_IO_Status(IO, "reading N from file")
-      close (In)
-   end function Read_N
+      open (newunit=out_unit, file=fileout, iostat=ios, action='write')
+      if (ios /= 0) stop "Error opening result.txt"
 
-   ! Вывод текста в файл.
-   subroutine Output_Text(OutputFile, Text)
-      character(*), intent(in)     :: OutputFile 
-      type(TextLine), intent(in)   :: Text 
-      integer                      :: Out
-      
-      open (file=OutputFile, encoding=E_, newunit=Out)
-         call Output_Text_Line(Out, Text)
-      close (Out)
-   end subroutine Output_Text
+      write(out_unit, '(a)') 'Исходный файл:'
+      if (allocated(text_list)) then
+         call write_text_list(out_unit, text_list)
+      else
+         write(out_unit, '(a)') '(пусто)'
+      end if
 
-   ! Вывод строки текста (рекурсивно).
-   recursive subroutine Output_Text_Line(Out, Text)
-      integer, intent(in)          :: Out
-      type(TextLine), intent(in)   :: Text
-      integer                      :: IO
 
-      write (Out, "(a)", iostat=IO) Text%String
-      call Handle_IO_Status(IO, "writing line to file")
-      if (Associated(Text%Next)) &
-         call Output_Text_Line(Out, Text%Next)
-   end subroutine Output_Text_Line
+      write(out_unit, '(a)') 'Размер листа:'
+      write(out_unit, '(i0)') win_size
 
-end module Text_IO
+      write(out_unit, '(a)') 'Команды:'
+      if (allocated(dir_list)) then
+         call write_dir_list(out_unit, dir_list)
+      else
+         write(out_unit, '(a)') '(нет команд)'
+      end if
+
+      write(out_unit, '(a)') 'Результат пролистывания:'
+      if (allocated(actions)) then
+         write(out_unit, '(a)') (actions(i), i = 1, size(actions))
+      else
+         write(out_unit, '(a)') '(нет данных)'
+      end if
+
+      close (out_unit)
+   end subroutine write_full_output
+ 
+   !рекурсивно записываем команды направления в файл
+   recursive subroutine write_dir_list(out_unit, head)
+      integer,                     intent(in) :: out_unit
+      type(dir_node), allocatable, intent(in) :: head
+
+      if (allocated(head)) then
+         write(out_unit, '(a)') head%dir
+         call write_dir_list(out_unit, head%next)
+      end if
+   end subroutine write_dir_list
+
+   !рекурсивно записываем строки текста в файл
+   recursive subroutine write_text_list(out_unit, head)
+      integer,                       intent(in) :: out_unit
+      type(text_node), allocatable, intent(in) :: head
+
+      if (allocated(head)) then
+         write(out_unit, '(a)') head%line
+         call write_text_list(out_unit, head%next)
+      end if
+   end subroutine write_text_list
+
+end module text_io
