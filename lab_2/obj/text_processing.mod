@@ -1,5 +1,5 @@
-﻿!mod$ v1 sum:8ab38fea7e191aea
-!need$ 5cbba2cdaa980ab0 n environment
+﻿!mod$ v1 sum:4a9aa7df4d40f19a
+!need$ ea6dd147e57435bd n environment
 module text_processing
 use environment,only:event_type
 use environment,only:notify_type
@@ -203,8 +203,47 @@ character(1_4,4),parameter,private::char_f=4_"f"
 character(1_4,4),parameter,private::char_f_big=4_"F"
 character(1_4,4),parameter,private::char_b=4_"b"
 character(1_4,4),parameter,private::char_b_big=4_"B"
+private::read_win_size
+private::read_text_list
+private::read_dir_list
+private::write_dir_list
+private::write_text_list
 private::next_pos
 contains
+subroutine read_all_data(file1,file2,text_list,dir_list,win_size)
+character(*,1),intent(in)::file1
+character(*,1),intent(in)::file2
+type(text_node),allocatable,intent(out)::text_list
+type(dir_node),allocatable,intent(out)::dir_list
+integer(4),intent(out)::win_size
+end
+subroutine read_win_size(in_unit,win_size)
+integer(4),intent(in)::in_unit
+integer(4),intent(out)::win_size
+end
+recursive subroutine read_text_list(in_unit,head)
+integer(4),intent(in)::in_unit
+type(text_node),allocatable::head
+end
+recursive subroutine read_dir_list(in_unit,head)
+integer(4),intent(in)::in_unit
+type(dir_node),allocatable::head
+end
+subroutine write_full_output(fileout,text_list,dir_list,win_size,actions)
+character(*,1),intent(in)::fileout
+type(text_node),allocatable,intent(in)::text_list
+type(dir_node),allocatable,intent(in)::dir_list
+integer(4),intent(in)::win_size
+character(:,4),allocatable,intent(in)::actions(:)
+end
+recursive subroutine write_dir_list(out_unit,head)
+integer(4),intent(in)::out_unit
+type(dir_node),allocatable,intent(in)::head
+end
+recursive subroutine write_text_list(out_unit,head)
+integer(4),intent(in)::out_unit
+type(text_node),allocatable,intent(in)::head
+end
 pure recursive function text_size(head) result(n)
 type(text_node),intent(in)::head
 integer(4)::n

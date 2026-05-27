@@ -1,6 +1,5 @@
 program reference_lab_list
    use Environment
-   use List_IO
    use List_Process
 
    implicit none
@@ -14,21 +13,19 @@ program reference_lab_list
    print *, "Обработка списка фамилий"
    print *
 
-   !формирование списка из файла
+   ! формирование списка из файла
    call S%read_from_file(input_file)
 
    call S%output(output_file, "Исходный список:", "rewind")
 
-   !чтение последней строки файла
+   ! чтение последней строки файла
    call read_last_line_from_file(input_file, last_line)
    print *, "Удаляемая фамилия: '", last_line, "'"
    print *
 
-   !удаление всех элементов, совпадающих с last_line
-   call delete_all(S, last_line)
+   ! удаление всех элементов, совпадающих с last_line
+   call S%delete_all(last_line)
 
    call S%output(output_file, "Список после удаления:", "append")
-
-   call S%destroy()
 
 end program reference_lab_list

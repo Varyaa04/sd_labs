@@ -1,6 +1,5 @@
-﻿!mod$ v1 sum:33dadf7e46df6942
-!need$ 55e77514761ffc6d n list_io
-!need$ 5cbba2cdaa980ab0 n environment
+﻿!mod$ v1 sum:546a6ed78797ccad
+!need$ ea6dd147e57435bd n environment
 module list_process
 use environment,only:event_type
 use environment,only:notify_type
@@ -97,25 +96,47 @@ use environment,only:operator(//)
 use environment,only:int_plus_string
 use environment,only:string_plus_int
 use environment,only:handle_io_status
-use list_io,only:node
-use list_io,only:stringlist
-use list_io,only:read_from_file
-use list_io,only:add_to_end
-use list_io,only:output
-use list_io,only:write_values
-use list_io,only:get_head
-use list_io,only:set_head
-use list_io,only:destroy
-use list_io,only:destroy_recursive
-use list_io,only:finalize_list
-use list_io,only:read_last_line_from_file
+type,private::node
+character(:,1),allocatable::value
+type(node),pointer::next=>NULL()
+end type
+intrinsic::null
+type::stringlist
+type(node),pointer,private::head=>NULL()
 contains
-recursive subroutine delete_all(list,name)
-type(stringlist),intent(inout)::list
+procedure::read_from_file
+procedure::output
+procedure::delete_all
+end type
+contains
+subroutine read_from_file(this,input_file)
+class(stringlist),intent(inout)::this
+character(*,1),intent(in)::input_file
+end
+recursive subroutine add_to_end(head,val)
+type(node),intent(inout),pointer::head
+character(*,1),intent(in)::val
+end
+subroutine output(this,output_file,header,position)
+class(stringlist),intent(in)::this
+character(*,1),intent(in)::output_file
+character(*,1),intent(in)::header
+character(*,1),intent(in)::position
+end
+recursive subroutine write_values(out,head)
+integer(4),intent(in)::out
+type(node),intent(in),pointer::head
+end
+recursive subroutine delete_all(this,name)
+class(stringlist),intent(inout)::this
 character(*,1),intent(in)::name
 end
-recursive subroutine delete_all_recursive(head,name)
+recursive subroutine delete_all_node(head,name)
 type(node),intent(inout),pointer::head
 character(*,1),intent(in)::name
+end
+subroutine read_last_line_from_file(input_file,last_line)
+character(*,1),intent(in)::input_file
+character(*,1),intent(out)::last_line
 end
 end

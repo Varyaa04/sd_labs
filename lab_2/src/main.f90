@@ -1,10 +1,9 @@
 program main
    use environment
    use text_processing
-   use text_io
 
    implicit none
-
+!инкапс
    character(*), parameter :: File1   = "../data/text.txt"
    character(*), parameter :: File2   = "../data/direction.txt"
    character(*), parameter :: FileOut = "output.txt"  
@@ -15,7 +14,7 @@ program main
    integer(I_) :: win_size, total_len
 
    call read_all_data(File1, File2, text_list, dir_list, win_size)
-
+!хранить текущую позицию и выводит лист, делать копию текущего листа
    if (allocated(text_list) .and. allocated(dir_list)) then
       total_len = text_size(text_list)
       actions = paginate(text_list, dir_list, win_size, 1, total_len)
