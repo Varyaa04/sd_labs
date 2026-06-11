@@ -1,5 +1,5 @@
-﻿!mod$ v1 sum:4a9aa7df4d40f19a
-!need$ ea6dd147e57435bd n environment
+﻿!mod$ v1 sum:0872014cdbc889ef
+!need$ 5cbba2cdaa980ab0 n environment
 module text_processing
 use environment,only:event_type
 use environment,only:notify_type
@@ -193,29 +193,82 @@ private::string_plus_int
 private::handle_io_status
 type::text_node
 character(:,4),allocatable::line
-type(text_node),allocatable::next
+type(text_node),pointer::next=>NULL()
+type(text_node),pointer::prev=>NULL()
 end type
+intrinsic::null
+private::null
 type::dir_node
 character(1_4,4)::dir
-type(dir_node),allocatable::next
+type(dir_node),pointer::next=>NULL()
+end type
+type::paginator
+type(text_node),pointer::current_pos=>NULL()
+integer(4)::win_size=0_4
+integer(4)::total_len=0_4
+contains
+procedure::init=>paginator_init
+procedure::move_forward=>paginator_move_forward
+procedure::move_back=>paginator_move_back
+procedure::get_window_copy=>paginator_get_window_copy
+procedure::set_position=>paginator_set_position
 end type
 character(1_4,4),parameter,private::char_f=4_"f"
 character(1_4,4),parameter,private::char_f_big=4_"F"
 character(1_4,4),parameter,private::char_b=4_"b"
 character(1_4,4),parameter,private::char_b_big=4_"B"
+type::text_processor
+type(text_node),pointer::text_list=>NULL()
+type(dir_node),pointer::dir_list=>NULL()
+character(:,4),allocatable::actions(:)
+integer(4)::win_size=0_4
+integer(4)::total_len=0_4
+contains
+procedure::init=>processor_init
+procedure::process=>processor_process
+procedure::write=>processor_write
+end type
+private::read_all_data
+private::processor_init
+private::processor_process
+private::processor_write
 private::read_win_size
 private::read_text_list
 private::read_dir_list
+private::write_full_output
 private::write_dir_list
 private::write_text_list
-private::next_pos
+private::paginator_init
+private::paginator_set_position
+private::paginator_move_forward
+private::paginator_move_back
+private::paginator_get_window_copy
+private::copy_window_recursive
+private::window_copy_to_array
+private::count_nodes
+private::copy_to_array_recursive
+private::paginate
+private::get_current_position
+private::text_size
 contains
 subroutine read_all_data(file1,file2,text_list,dir_list,win_size)
 character(*,1),intent(in)::file1
 character(*,1),intent(in)::file2
-type(text_node),allocatable,intent(out)::text_list
-type(dir_node),allocatable,intent(out)::dir_list
+type(text_node),intent(out),pointer::text_list
+type(dir_node),intent(out),pointer::dir_list
 integer(4),intent(out)::win_size
+end
+subroutine processor_init(this,file1,file2)
+class(text_processor),intent(inout)::this
+character(*,1),intent(in)::file1
+character(*,1),intent(in)::file2
+end
+subroutine processor_process(this)
+class(text_processor),intent(inout)::this
+end
+subroutine processor_write(this,fileout)
+class(text_processor),intent(in)::this
+character(*,1),intent(in)::fileout
 end
 subroutine read_win_size(in_unit,win_size)
 integer(4),intent(in)::in_unit
@@ -223,49 +276,80 @@ integer(4),intent(out)::win_size
 end
 recursive subroutine read_text_list(in_unit,head)
 integer(4),intent(in)::in_unit
-type(text_node),allocatable::head
+type(text_node),intent(out),pointer::head
 end
 recursive subroutine read_dir_list(in_unit,head)
 integer(4),intent(in)::in_unit
-type(dir_node),allocatable::head
+type(dir_node),intent(out),pointer::head
 end
 subroutine write_full_output(fileout,text_list,dir_list,win_size,actions)
 character(*,1),intent(in)::fileout
-type(text_node),allocatable,intent(in)::text_list
-type(dir_node),allocatable,intent(in)::dir_list
+type(text_node),intent(in),pointer::text_list
+type(dir_node),intent(in),pointer::dir_list
 integer(4),intent(in)::win_size
 character(:,4),allocatable,intent(in)::actions(:)
 end
 recursive subroutine write_dir_list(out_unit,head)
 integer(4),intent(in)::out_unit
-type(dir_node),allocatable,intent(in)::head
+type(dir_node),intent(in),pointer::head
 end
 recursive subroutine write_text_list(out_unit,head)
 integer(4),intent(in)::out_unit
-type(text_node),allocatable,intent(in)::head
+type(text_node),intent(in),pointer::head
 end
-pure recursive function text_size(head) result(n)
-type(text_node),intent(in)::head
+subroutine paginator_init(this,head,win_size,total_len)
+class(paginator),intent(inout)::this
+type(text_node),intent(in),target::head
+integer(4),intent(in)::win_size
+integer(4),intent(in)::total_len
+end
+subroutine paginator_set_position(this,pos)
+class(paginator),intent(inout)::this
+integer(4),intent(in)::pos
+end
+subroutine paginator_move_forward(this)
+class(paginator),intent(inout)::this
+end
+subroutine paginator_move_back(this)
+class(paginator),intent(inout)::this
+end
+function paginator_get_window_copy(this) result(window_copy)
+class(paginator),intent(in)::this
+type(text_node),pointer::window_copy
+end
+recursive subroutine copy_window_recursive(src,win_size,depth,dest)
+type(text_node),intent(in),pointer::src
+integer(4),intent(in)::win_size
+integer(4),intent(in)::depth
+type(text_node),intent(out),pointer::dest
+end
+function window_copy_to_array(window) result(lines)
+type(text_node),intent(in),pointer::window
+character(:,4),allocatable::lines(:)
+end
+recursive function count_nodes(head) result(n)
+type(text_node),intent(in),pointer::head
 integer(4)::n
 end
-pure recursive function get_line(head,k) result(res)
-type(text_node),intent(in)::head
-integer(4),intent(in)::k
-character(:,4),allocatable::res
+recursive subroutine copy_to_array_recursive(node,arr,idx)
+type(text_node),intent(in),pointer::node
+character(:,4),allocatable,intent(inout)::arr(:)
+integer(4),intent(in)::idx
 end
-pure function next_pos(pos,dir,win_size,total)
-integer(4),intent(in)::pos
-character(1_4,4),intent(in)::dir
+recursive function paginate(text,dirs,win_size,start_pos,total) result(actions)
+type(text_node),intent(in),pointer::text
+type(dir_node),intent(in),pointer::dirs
 integer(4),intent(in)::win_size
-integer(4),intent(in)::total
-integer(4)::next_pos
-end
-recursive function paginate(text,dirs,win_size,pos,total) result(actions)
-type(text_node),allocatable,intent(in)::text
-type(dir_node),allocatable,intent(in)::dirs
-integer(4),intent(in)::win_size
-integer(4),intent(in)::pos
+integer(4),intent(in)::start_pos
 integer(4),intent(in)::total
 character(:,4),allocatable::actions(:)
+end
+function get_current_position(pager) result(pos)
+class(paginator),intent(in)::pager
+integer(4)::pos
+end
+recursive function text_size(head) result(n)
+type(text_node),intent(in),pointer::head
+integer(4)::n
 end
 end

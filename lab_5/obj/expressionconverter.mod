@@ -1,6 +1,6 @@
-﻿!mod$ v1 sum:649fc02325440505
+﻿!mod$ v1 sum:aa8b03127d670f4f
 !need$ 5cbba2cdaa980ab0 n environment
-module list_process
+module expressionconverter
 use environment,only:event_type
 use environment,only:notify_type
 use environment,only:lock_type
@@ -99,7 +99,6 @@ use environment,only:handle_io_status
 type,abstract::base_node
 contains
 procedure(print_interface),deferred,pass::print
-procedure(equals_interface),deferred,pass::equals
 end type
 abstract interface
 subroutine print_interface(this,unit)
@@ -108,84 +107,73 @@ class(base_node),intent(in)::this
 integer(4),intent(in)::unit
 end
 end interface
-abstract interface
-function equals_interface(this,value)
-import::base_node
-class(base_node),intent(in)::this
-character(*,1),intent(in)::value
-logical(4)::equals_interface
-end
-end interface
-type,extends(base_node)::node
-character(:,1),allocatable::value
-type(node),pointer::next=>NULL()
+type,extends(base_node)::expr_node
+character(1_4,1)::value
+type(expr_node),pointer::left=>NULL()
+type(expr_node),pointer::right=>NULL()
 contains
 procedure,pass::print=>print_node
-procedure,pass::equals=>node_equals
 end type
 intrinsic::null
-type::stringlist
-type(node),pointer,private::head=>NULL()
-character(:,1),allocatable,private::last_line_to_delete
-integer(4),private::list_size=0_4
+type::expressionconverter
+character(:,1),allocatable,private::prefix_expr
+character(:,1),allocatable,private::postfix_expr
+integer(4),private::pos
+logical(4),private::is_valid
+character(100_4,1),private::error_msg
 contains
-procedure::read_from_file
-procedure::output
-procedure::delete_last_line_from_file
-procedure::delete_all
-procedure,private::add_to_end
-procedure,private::clear_list
-procedure,private::write_values_polymorphic
-procedure,private::delete_all_recursive
-final::stringlist_destructor
+procedure::read_expression
+procedure::validate_and_convert
+procedure::output_result
+procedure,private::parse_expression
+procedure,private::to_postfix
+procedure,private::check_operand
+procedure,private::check_operator
+procedure,private::clear_tree
+final::converter_destructor
 end type
+character(1_4,1),parameter::operators(1_8:4_8)=[CHARACTER(KIND=1,LEN=1)::"+","-","*","/"]
+character(1_4,1),parameter::open_paren="("
+character(1_4,1),parameter::close_paren=")"
 contains
-subroutine stringlist_destructor(this)
-type(stringlist),intent(inout)::this
+subroutine converter_destructor(this)
+type(expressionconverter),intent(inout)::this
 end
 subroutine print_node(this,unit)
-class(node),intent(in)::this
+class(expr_node),intent(in)::this
 integer(4),intent(in)::unit
 end
-function node_equals(this,value)
-class(node),intent(in)::this
-character(*,1),intent(in)::value
-logical(4)::node_equals
-end
-subroutine read_from_file(this,input_file)
-class(stringlist),intent(inout)::this
+subroutine read_expression(this,input_file)
+class(expressionconverter),intent(inout)::this
 character(*,1),intent(in)::input_file
 end
-recursive subroutine add_to_end(this,head,val)
-class(stringlist),intent(inout)::this
-type(node),intent(inout),pointer::head
-character(*,1),intent(in)::val
+subroutine validate_and_convert(this)
+class(expressionconverter),intent(inout)::this
 end
-recursive subroutine clear_list(this,head)
-class(stringlist),intent(inout)::this
-type(node),intent(inout),pointer::head
+recursive subroutine parse_expression(this,node)
+class(expressionconverter),intent(inout)::this
+type(expr_node),intent(out),pointer::node
 end
-subroutine output(this,output_file,header,position)
-class(stringlist),intent(in)::this
+function check_operand(this,ch) result(res)
+class(expressionconverter),intent(in)::this
+character(1_4,1),intent(in)::ch
+logical(4)::res
+end
+function check_operator(this,ch) result(res)
+class(expressionconverter),intent(in)::this
+character(1_4,1),intent(in)::ch
+logical(4)::res
+end
+recursive subroutine to_postfix(this,node)
+class(expressionconverter),intent(inout)::this
+type(expr_node),intent(in),pointer::node
+end
+recursive subroutine clear_tree(this,node)
+class(expressionconverter),intent(inout)::this
+type(expr_node),intent(inout),pointer::node
+end
+subroutine output_result(this,output_file)
+class(expressionconverter),intent(in)::this
 character(*,1),intent(in)::output_file
-character(*,1),intent(in)::header
-character(*,1),intent(in)::position
-end
-recursive subroutine write_values_polymorphic(this,out,head)
-class(stringlist),intent(in)::this
-integer(4),intent(in)::out
-class(base_node),intent(in),pointer::head
-end
-subroutine delete_last_line_from_file(this,input_file)
-class(stringlist),intent(inout)::this
-character(*,1),intent(in)::input_file
-end
-recursive subroutine delete_all(this)
-class(stringlist),intent(inout)::this
-end
-recursive subroutine delete_all_recursive(this,head,deleted_count)
-class(stringlist),intent(inout)::this
-type(node),intent(inout),pointer::head
-integer(4),intent(inout)::deleted_count
 end
 end

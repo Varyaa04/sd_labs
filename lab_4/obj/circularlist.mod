@@ -1,6 +1,6 @@
-﻿!mod$ v1 sum:649fc02325440505
+﻿!mod$ v1 sum:8393402358a6b0be
 !need$ 5cbba2cdaa980ab0 n environment
-module list_process
+module circularlist
 use environment,only:event_type
 use environment,only:notify_type
 use environment,only:lock_type
@@ -109,83 +109,92 @@ integer(4),intent(in)::unit
 end
 end interface
 abstract interface
-function equals_interface(this,value)
+function equals_interface(this,name)
 import::base_node
 class(base_node),intent(in)::this
-character(*,1),intent(in)::value
+character(*,1),intent(in)::name
 logical(4)::equals_interface
 end
 end interface
 type,extends(base_node)::node
-character(:,1),allocatable::value
+character(:,1),allocatable::name
 type(node),pointer::next=>NULL()
 contains
 procedure,pass::print=>print_node
 procedure,pass::equals=>node_equals
 end type
 intrinsic::null
-type::stringlist
+type::circularlist
 type(node),pointer,private::head=>NULL()
-character(:,1),allocatable,private::last_line_to_delete
-integer(4),private::list_size=0_4
+type(node),pointer,private::current=>NULL()
+integer(4),private::size=0_4
 contains
-procedure::read_from_file
-procedure::output
-procedure::delete_last_line_from_file
-procedure::delete_all
-procedure,private::add_to_end
+procedure::read_names
+procedure::play_game
+procedure::output_result
+procedure,private::add_to_circular
+procedure,private::find_starting_node
+procedure,private::counting_game_recursive
+procedure,private::print_remaining
 procedure,private::clear_list
-procedure,private::write_values_polymorphic
-procedure,private::delete_all_recursive
-final::stringlist_destructor
+final::circularlist_destructor
 end type
 contains
-subroutine stringlist_destructor(this)
-type(stringlist),intent(inout)::this
+subroutine circularlist_destructor(this)
+type(circularlist),intent(inout)::this
 end
 subroutine print_node(this,unit)
 class(node),intent(in)::this
 integer(4),intent(in)::unit
 end
-function node_equals(this,value)
+function node_equals(this,name)
 class(node),intent(in)::this
-character(*,1),intent(in)::value
+character(*,1),intent(in)::name
 logical(4)::node_equals
 end
-subroutine read_from_file(this,input_file)
-class(stringlist),intent(inout)::this
+subroutine read_names(this,input_file)
+class(circularlist),intent(inout)::this
 character(*,1),intent(in)::input_file
 end
-recursive subroutine add_to_end(this,head,val)
-class(stringlist),intent(inout)::this
-type(node),intent(inout),pointer::head
-character(*,1),intent(in)::val
+recursive subroutine add_to_circular(this,name)
+class(circularlist),intent(inout)::this
+character(*,1),intent(in)::name
 end
-recursive subroutine clear_list(this,head)
-class(stringlist),intent(inout)::this
-type(node),intent(inout),pointer::head
+recursive subroutine add_recursive(head,name)
+type(node),intent(in),pointer::head
+character(*,1),intent(in)::name
 end
-subroutine output(this,output_file,header,position)
-class(stringlist),intent(in)::this
+recursive subroutine close_circular(head)
+type(node),intent(in),pointer::head
+end
+subroutine play_game(this,start_name,m)
+class(circularlist),intent(inout)::this
+character(*,1),intent(in)::start_name
+integer(4),intent(in)::m
+end
+recursive subroutine counting_game_recursive(this,start_node,m,remaining)
+class(circularlist),intent(inout)::this
+type(node),intent(in),pointer::start_node
+integer(4),intent(in)::m
+integer(4),intent(in)::remaining
+end
+subroutine find_starting_node(this,start_name)
+class(circularlist),intent(inout)::this
+character(*,1),intent(in)::start_name
+end
+subroutine print_remaining(this,start_node,count)
+class(circularlist),intent(in)::this
+type(node),intent(in),pointer::start_node
+integer(4),intent(in)::count
+end
+subroutine output_result(this,output_file)
+class(circularlist),intent(in)::this
 character(*,1),intent(in)::output_file
-character(*,1),intent(in)::header
-character(*,1),intent(in)::position
 end
-recursive subroutine write_values_polymorphic(this,out,head)
-class(stringlist),intent(in)::this
-integer(4),intent(in)::out
-class(base_node),intent(in),pointer::head
+recursive subroutine clear_list(this)
+class(circularlist),intent(inout)::this
 end
-subroutine delete_last_line_from_file(this,input_file)
-class(stringlist),intent(inout)::this
-character(*,1),intent(in)::input_file
-end
-recursive subroutine delete_all(this)
-class(stringlist),intent(inout)::this
-end
-recursive subroutine delete_all_recursive(this,head,deleted_count)
-class(stringlist),intent(inout)::this
-type(node),intent(inout),pointer::head
-integer(4),intent(inout)::deleted_count
+recursive subroutine clear_recursive(node_ptr)
+type(node),intent(inout),pointer::node_ptr
 end
 end

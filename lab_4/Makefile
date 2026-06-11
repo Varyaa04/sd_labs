@@ -10,10 +10,10 @@ OMP_INC = -I$(OMP_ROOT)/include
 
 all: obj bin
 	$(FC) $(FFLAGS) $(OMP_INC) -c src/environment.f90 -J obj/ -o obj/environment.o
-	$(FC) $(FFLAGS) $(FOPT) $(OMP_INC) -c src/text_process.f90 -J obj/ -o obj/text_process.o
-	$(FC) $(FFLAGS) $(FOPT) $(OMP_INC) -c src/text_io.f90 -J obj/ -o obj/text_io.o
+#	$(FC) $(FFLAGS) $(FOPT) $(OMP_INC) -c src/list_io.f90 -J obj/ -o obj/list_io.o
+	$(FC) $(FFLAGS) $(FOPT) $(OMP_INC) -c src/circular_list.f90 -J obj/ -o obj/circular_list.o
 	$(FC) $(FFLAGS) $(FOPT) $(OMP_INC) -c src/main.f90 -I obj/ -o obj/main.o
-	$(FC) $(FFLAGS) $(FOPT) -o bin/app obj/environment.o obj/text_process.o  obj/main.o $(OMP_LIB)
+	$(FC) $(FFLAGS) $(FOPT) -o bin/app obj/environment.o obj/circular_list.o obj/main.o $(OMP_LIB)
 
 obj:
 	mkdir -p obj

@@ -3,23 +3,84 @@ module List_Process
 
    implicit none
 
-   ! рекурсивный производный тип
-   type, private  :: node
+   ! базовый абстрактный тип для узла (полиморфизм)
+   type, public, abstract :: base_node
+   contains
+      procedure(print_interface), deferred, pass :: print
+      procedure(equals_interface), deferred, pass :: equals
+   end type base_node
+
+   abstract interface
+      subroutine print_interface(this, unit)
+         import base_node
+         class(base_node), intent(in) :: this
+         integer, intent(in) :: unit
+      end subroutine print_interface
+      
+      logical function equals_interface(this, value)
+         import base_node
+         class(base_node), intent(in) :: this
+         character(*), intent(in) :: value
+      end function equals_interface
+   end interface
+
+   ! рекурсивный производный тип узла (наследование)
+   type, extends(base_node), public :: node
       character(:), allocatable :: value
       type(node), pointer       :: next => Null()
+   contains
+      procedure, pass :: print => print_node
+      procedure, pass :: equals => node_equals
    end type node
 
    ! инкапсулирующий тип для списка
    type, public :: StringList
    private
       type(node), pointer :: head => Null()
+      character(:), allocatable :: last_line_to_delete
+      integer :: list_size = 0
    contains
-      procedure :: read_from_file
-      procedure :: output
-      procedure :: delete_all
+      procedure, public :: read_from_file
+      procedure, public :: output
+      procedure, public :: delete_last_line_from_file
+      procedure, public :: delete_all
+      procedure, private :: add_to_end
+      procedure, private :: clear_list
+      procedure, private :: write_values_polymorphic
+      procedure, private :: delete_all_recursive
+      final :: stringlist_destructor
    end type StringList
 
 contains
+
+   ! завершаемая функция - автоматическое удаление списка
+   subroutine stringlist_destructor(this)
+      type(StringList), intent(inout) :: this
+      type(node), pointer :: current, next_node
+      
+      current => this%head
+      do while (associated(current))
+         next_node => current%next
+         deallocate(current)
+         current => next_node
+      end do
+      this%head => Null()
+      this%list_size = 0
+   end subroutine stringlist_destructor
+
+   ! реализация полиморфного метода print
+   subroutine print_node(this, unit)
+      class(node), intent(in) :: this
+      integer, intent(in) :: unit
+      write(unit, '(5x, a)') trim(this%value)
+   end subroutine print_node
+
+   ! реализация полиморфного метода equals
+   logical function node_equals(this, value)
+      class(node), intent(in) :: this
+      character(*), intent(in) :: value
+      node_equals = (this%value == value)
+   end function node_equals
 
    ! чтение списка из файла
    subroutine read_from_file(this, input_file)
@@ -28,17 +89,27 @@ contains
       integer :: In, IO
       character(100) :: buffer
 
-      open (file=input_file, newunit=In)
+      if (associated(this%head)) then
+         call this%clear_list(this%head)
+         this%head => Null()
+         this%list_size = 0
+      end if
+
+      open (file=input_file, newunit=In, status='old', action='read')
       do
          read (In, '(a)', iostat=IO) buffer
          if (IO /= 0) exit
-         call add_to_end(this%head, buffer)
+         if (len_trim(buffer) > 0) then
+            call this%add_to_end(this%head, trim(buffer))
+            this%list_size = this%list_size + 1
+         end if
       end do
       close (In)
    end subroutine read_from_file
 
-   ! хвостовая рекурсия для добавления в конец
-   recursive subroutine add_to_end(head, val)
+   ! добавление в конец (рекурсивная)
+   recursive subroutine add_to_end(this, head, val)
+      class(StringList), intent(inout) :: this
       type(node), pointer, intent(inout) :: head
       character(*), intent(in) :: val
 
@@ -47,9 +118,22 @@ contains
          head%value = val
          head%next => Null()
       else
-         call add_to_end(head%next, val)
+         call this%add_to_end(head%next, val)
       end if
    end subroutine add_to_end
+
+   ! очистка списка (рекурсивная)
+   recursive subroutine clear_list(this, head)
+      class(StringList), intent(inout) :: this
+      type(node), pointer, intent(inout) :: head
+      if (associated(head)) then
+         if (associated(head%next)) then
+            call this%clear_list(head%next)
+         end if
+         deallocate(head)
+         head => Null()
+      end if
+   end subroutine clear_list
 
    ! вывод списка
    subroutine output(this, output_file, header, position)
@@ -65,73 +149,78 @@ contains
       write (Out, '(a)') header
       
       if (associated(this%head)) then
-         call write_values(Out, this%head)
+         call this%write_values_polymorphic(Out, this%head)
       else
          write (Out, '(a)') "  (список пуст)"
       end if
       close (Out)
    end subroutine output
 
-   recursive subroutine write_values(out, head)
+   ! полиморфная рекурсивная запись значений
+   recursive subroutine write_values_polymorphic(this, out, head)
+      class(StringList), intent(in) :: this
       integer, intent(in) :: out
-      type(node), pointer, intent(in) :: head
+      class(base_node), pointer, intent(in) :: head
+      type(node), pointer :: node_ptr
 
       if (.not. associated(head)) return
-      write (out, '(5x, a)') head%value
-      call write_values(out, head%next)
-   end subroutine write_values
+      
+      select type(head)
+      type is (node)
+         node_ptr => head
+         call node_ptr%print(out)
+         call this%write_values_polymorphic(out, node_ptr%next)
+      end select
+   end subroutine write_values_polymorphic
 
-   ! удаление всех вхождений
-   recursive subroutine delete_all(this, name)
+   ! чтение последней строки из файла и сохранение её для удаления
+   subroutine delete_last_line_from_file(this, input_file)
       class(StringList), intent(inout) :: this
-      character(*), intent(in) :: name
-      type(node), pointer :: tmp
-
-      if (.not. associated(this%head)) return
-
-      if (this%head%value == name) then
-         tmp => this%head
-         this%head => this%head%next
-         deallocate(tmp)
-         call delete_all(this, name)
-      else
-         call delete_all_node(this%head%next, name)
-      end if
-   end subroutine delete_all
-
-   ! рекурсивная процедура удаления для узлов
-   recursive subroutine delete_all_node(head, name)
-      type(node), pointer, intent(inout) :: head
-      character(*), intent(in) :: name
-      type(node), pointer :: tmp
-
-      if (.not. associated(head)) return
-
-      if (head%value == name) then
-         tmp => head
-         head => head%next
-         deallocate(tmp)
-         call delete_all_node(head, name)
-      else
-         call delete_all_node(head%next, name)
-      end if
-   end subroutine delete_all_node
-
-   ! чтение последней строки из файла
-   subroutine read_last_line_from_file(input_file, last_line)
       character(*), intent(in) :: input_file
-      character(*), intent(out) :: last_line
       integer :: In, IO
       character(100) :: buffer
 
-      open (file=input_file, newunit=In)
-      last_line = ""
+      open (file=input_file, newunit=In, status='old', action='read')
+      this%last_line_to_delete = ""
       do
          read (In, '(a)', iostat=IO) buffer
          if (IO /= 0) exit
-         last_line = buffer
+         if (len_trim(buffer) > 0) this%last_line_to_delete = trim(buffer)
       end do
       close (In)
-   end subroutine read_last_line_from_file
+   end subroutine delete_last_line_from_file
+
+   ! удаление всех вхождений
+   recursive subroutine delete_all(this)
+      class(StringList), intent(inout) :: this
+      integer :: deleted_count
+
+      if (.not. associated(this%head)) return
+      if (.not. allocated(this%last_line_to_delete)) return
+
+      deleted_count = 0
+      call this%delete_all_recursive(this%head, deleted_count)
+      this%list_size = this%list_size - deleted_count
+   end subroutine delete_all
+
+   ! рекурсивная процедура удаления для узлов
+   recursive subroutine delete_all_recursive(this, head, deleted_count)
+      class(StringList), intent(inout) :: this
+      type(node), pointer, intent(inout) :: head
+      integer, intent(inout) :: deleted_count
+      type(node), pointer :: tmp
+
+      if (.not. associated(head)) return
+
+      if (head%equals(this%last_line_to_delete)) then
+         tmp => head
+         head => head%next
+         deallocate(tmp)
+         deleted_count = deleted_count + 1
+         call this%delete_all_recursive(head, deleted_count)
+      else
+         call this%delete_all_recursive(head%next, deleted_count)
+      end if
+   end subroutine delete_all_recursive
 
 end module List_Process
