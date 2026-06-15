@@ -7,7 +7,7 @@ program main
 
    call S%read_from_file("../data/input.txt")
    call S%output("output.txt", "Исходный список:", "rewind")
-   call S%delete_last_line_from_file("../data/input.txt")
+   call S%last_line_from_file("../data/input.txt")
    call S%delete_all()
    call S%output("output.txt", "Список после удаления:", "append")
 

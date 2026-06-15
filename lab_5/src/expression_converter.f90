@@ -3,7 +3,7 @@ module ExpressionConverter
 
    implicit none
 
-   ! базовый абстрактный тип для узла (полиморфизм)
+   ! базовый абстрактный тип для узла
    type, public, abstract :: base_node
    contains
       procedure(print_interface), deferred, pass :: print
@@ -151,7 +151,7 @@ contains
       
    end subroutine validate_and_convert
 
-   ! рекурсивный парсинг выражения (префиксная нотация)
+   ! рекурсивный парсинг выражения
    recursive subroutine parse_expression(this, node)
       class(ExpressionConverter), intent(inout) :: this
       type(expr_node), pointer, intent(out) :: node
@@ -166,7 +166,7 @@ contains
       
       ch = this%prefix_expr(this%pos:this%pos)
       
-      ! если это операнд (буква)
+      ! если это операнд
       if (this%check_operand(ch)) then
          allocate(node)
          node%value = ch
@@ -203,13 +203,12 @@ contains
       
    end subroutine parse_expression
 
-   ! проверка, является ли символ операндом (латинская буква)
+   ! проверка, является ли символ операндом 
    function check_operand(this, ch) result(res)
       class(ExpressionConverter), intent(in) :: this
       character(1), intent(in) :: ch
       logical :: res
       
-      ! можно расширить на строчные буквы и цифры
       res = (ch >= 'A' .and. ch <= 'Z') .or. (ch >= 'a' .and. ch <= 'z')
    end function check_operand
 
@@ -240,7 +239,7 @@ contains
       call this%to_postfix(node%left)
       call this%to_postfix(node%right)
       
-      ! добавляем текущий узел (без лишних пробелов)
+      ! добавляем текущий узел
       if (this%postfix_expr == "") then
          this%postfix_expr = node%value
       else

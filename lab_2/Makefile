@@ -2,10 +2,10 @@ FC = flang
 FFLAGS = -fimplicit-none -fopenmp -march=native
 FOPT = -O3
 
-#OMP_ROOT = /usr/lib/llvm-19
-#OMP_LIB = -L$(OMP_ROOT)/lib -lomp
-OMP_ROOT = /opt/homebrew/opt/libomp
+OMP_ROOT = /usr/lib/llvm-19
 OMP_LIB = -L$(OMP_ROOT)/lib -lomp
+#OMP_ROOT = /opt/homebrew/opt/libomp
+#OMP_LIB = -L$(OMP_ROOT)/lib -lomp
 OMP_INC = -I$(OMP_ROOT)/include
 
 all: obj bin
@@ -25,6 +25,5 @@ clean:
 	rm -rf obj/* bin/* output.txt
 
 run:
-	cd ./bin && ./app
+	ulimit -s unlimited && cd ./bin && ./app
 	cat bin/output.txt
-    LANG=ru_RU.UTF-8 cat bin/output.txt

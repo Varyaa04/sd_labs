@@ -1,5 +1,5 @@
-﻿!mod$ v1 sum:80e29aad0299a5e1
-!need$ 5cbba2cdaa980ab0 n environment
+﻿!mod$ v1 sum:79d8285db280a9fe
+!need$ ea6dd147e57435bd n environment
 module list_process
 use environment,only:event_type
 use environment,only:notify_type
@@ -96,74 +96,37 @@ use environment,only:operator(//)
 use environment,only:int_plus_string
 use environment,only:string_plus_int
 use environment,only:handle_io_status
-type,abstract::base_node
-contains
-procedure(print_interface),deferred,pass::print
-procedure(equals_interface),deferred,pass::equals
-end type
-abstract interface
-subroutine print_interface(this,unit)
-import::base_node
-class(base_node),intent(in)::this
-integer(4),intent(in)::unit
-end
-end interface
-abstract interface
-function equals_interface(this,value)
-import::base_node
-class(base_node),intent(in)::this
-character(*,1),intent(in)::value
-logical(4)::equals_interface
-end
-end interface
-type,extends(base_node)::node
+type::node
 character(:,1),allocatable::value
-type(node),pointer::next=>NULL()
-contains
-procedure,pass::print=>print_node
-procedure,pass::equals=>node_equals
+type(node),allocatable::next
 end type
-intrinsic::null
 type::stringlist
-type(node),pointer,private::head=>NULL()
+type(node),allocatable,private::head
 character(:,1),allocatable,private::last_line_to_delete
 integer(4),private::list_size=0_4
 contains
 procedure::read_from_file
 procedure::output
-procedure::delete_last_line_from_file
+procedure::last_line_from_file
 procedure::delete_all
 procedure,private::add_to_end
 procedure,private::clear_list
-procedure,private::write_values_polymorphic
 procedure,private::delete_all_recursive
-final::stringlist_destructor
+procedure,private::output_recursive
 end type
 contains
-subroutine stringlist_destructor(this)
-type(stringlist),intent(inout)::this
-end
-subroutine print_node(this,unit)
-class(node),intent(in)::this
-integer(4),intent(in)::unit
-end
-function node_equals(this,value)
-class(node),intent(in)::this
-character(*,1),intent(in)::value
-logical(4)::node_equals
-end
 subroutine read_from_file(this,input_file)
 class(stringlist),intent(inout)::this
 character(*,1),intent(in)::input_file
 end
 recursive subroutine add_to_end(this,head,val)
 class(stringlist),intent(inout)::this
-type(node),intent(inout),pointer::head
+type(node),allocatable,intent(inout)::head
 character(*,1),intent(in)::val
 end
 recursive subroutine clear_list(this,head)
 class(stringlist),intent(inout)::this
-type(node),intent(inout),pointer::head
+type(node),allocatable,intent(inout)::head
 end
 subroutine output(this,output_file,header,position)
 class(stringlist),intent(in)::this
@@ -171,12 +134,12 @@ character(*,1),intent(in)::output_file
 character(*,1),intent(in)::header
 character(*,1),intent(in)::position
 end
-recursive subroutine write_values_polymorphic(this,out,head)
+recursive subroutine output_recursive(this,unit,current)
 class(stringlist),intent(in)::this
-integer(4),intent(in)::out
-class(base_node),intent(in),pointer::head
+integer(4),intent(in)::unit
+type(node),intent(in)::current
 end
-subroutine delete_last_line_from_file(this,input_file)
+subroutine last_line_from_file(this,input_file)
 class(stringlist),intent(inout)::this
 character(*,1),intent(in)::input_file
 end
@@ -185,7 +148,7 @@ class(stringlist),intent(inout)::this
 end
 recursive subroutine delete_all_recursive(this,head,deleted_count)
 class(stringlist),intent(inout)::this
-type(node),intent(inout),pointer::head
+type(node),allocatable,intent(inout)::head
 integer(4),intent(inout)::deleted_count
 end
 end

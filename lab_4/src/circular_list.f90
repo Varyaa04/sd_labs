@@ -27,7 +27,7 @@ module CircularList
    !рекурсивный производный тип узла 
    type, extends(base_node), public :: node
       character(:), allocatable :: name
-      type(node), pointer       :: next => null()
+      type(node), allocatable   :: next
    contains
       procedure, pass :: print => print_node
       procedure, pass :: equals => node_equals
@@ -36,8 +36,8 @@ module CircularList
    !инкапсулирующий тип для кольцевого списка
    type, public :: CircularList
    private
-      type(node), pointer :: head => null()
-      type(node), pointer :: current => null()
+      type(node), allocatable :: head
+      type(node), allocatable :: current
       integer :: size = 0
    contains
       procedure, public :: read_names
@@ -99,28 +99,47 @@ contains
    subroutine add_to_circular(this, name)
       class(CircularList), intent(inout) :: this
       character(*), intent(in) :: name
-      type(node), pointer :: new_node, last
+      type(node), allocatable :: new_node
+      type(node), pointer :: last
       
       allocate(new_node)
       new_node%name = name
       
-      if (.not. associated(this%head)) then
+      if (.not. allocated(this%head)) then
          !первый узел - указывает сам на себя
-         this%head => new_node
-         this%head%next => this%head
+         call move_alloc(new_node, this%head)
+         allocate(this%head%next, source=this%head)
       else
          !находим последний узел 
-         last => this%head
-         do while (.not. associated(last%next, this%head))
-            last => last%next
-         end do
+         last => find_last_node(this%head)
          
-         last%next => new_node
-         new_node%next => this%head
+         !добавляем новый узел
+         allocate(last%next, source=new_node)
+         last%next%next => this%head
+         
+         deallocate(new_node)
       end if
       
       this%size = this%size + 1
    end subroutine add_to_circular
+   
+   !вспомогательная функция для поиска последнего узла
+   function find_last_node(head) result(last)
+      type(node), allocatable, intent(in) :: head
+      type(node), pointer :: last
+      type(node), pointer :: current
+      
+      if (.not. allocated(head)) then
+         last => null()
+         return
+      end if
+      
+      current => head
+      do while (.not. associated(current%next, head))
+         current => current%next
+      end do
+      last => current
+   end function find_last_node
 
    !основная игра
    subroutine play_game(this, start_name, m)
@@ -129,6 +148,7 @@ contains
       integer, intent(in) :: m
       integer :: remaining, i
       type(node), pointer :: prev
+      type(node), pointer :: current_ptr
       
       !проверка корректности входных данных
       if (this%size == 0) then
@@ -144,7 +164,7 @@ contains
       !находим начальный узел
       call this%find_starting_node(start_name)
       
-      if (.not. associated(this%current)) then
+      if (.not. allocated(this%current)) then
          write(*, '(a)') "Ошибка: не найден начальный узел!"
          return
       end if
@@ -167,10 +187,13 @@ contains
       do while (remaining > 1)
          !делаем m-1 шагов для нахождения удаляемого узла
          prev => this%current
+         current_ptr => this%current
          do i = 1, m-1
-            prev => this%current
-            this%current => this%current%next
+            prev => current_ptr
+            current_ptr => current_ptr%next
          end do
+         
+         this%current = current_ptr
          
          !удаляем текущий узел
          call remove_current_node(this, prev, remaining)
@@ -193,19 +216,19 @@ contains
    subroutine play_game_m1(this, remaining)
       class(CircularList), intent(inout) :: this
       integer, intent(inout) :: remaining
-      type(node), pointer :: to_remove
+      type(node), pointer :: to_remove_ptr
       
       do while (remaining > 1)
          write(*, '(a, a)') "Выбывает: ", trim(this%current%name)
          
-         to_remove => this%current
+         to_remove_ptr => this%current
          this%current => this%current%next
          
-         if (associated(to_remove, this%head)) then
-            this%head => this%current
+         if (associated(to_remove_ptr, this%head)) then
+            call move_alloc(this%current, this%head)
          end if
          
-         deallocate(to_remove)
+         deallocate(to_remove_ptr)
          remaining = remaining - 1
          
          call this%print_remaining(remaining)
@@ -218,24 +241,24 @@ contains
       class(CircularList), intent(inout) :: this
       type(node), pointer, intent(in) :: prev
       integer, intent(inout) :: remaining
-      type(node), pointer :: to_remove
-      type(node), pointer :: last
+      type(node), pointer :: to_remove_ptr
+      type(node), allocatable :: temp
       
       write(*, '(a, a)') "Выбывает: ", trim(this%current%name)
       
-      to_remove => this%current
+      to_remove_ptr => this%current
       
       !переподвязываем указатели
-      prev%next => to_remove%next
+      prev%next => to_remove_ptr%next
       
-      if (associated(to_remove, this%head)) then
-         this%head => to_remove%next
+      if (associated(to_remove_ptr, this%head)) then
+         call move_alloc(to_remove_ptr%next, this%head)
       end if
       
       !переходим к следующему узлу
-      this%current => to_remove%next
+      call move_alloc(to_remove_ptr%next, this%current)
       
-      deallocate(to_remove)
+      deallocate(to_remove_ptr)
       remaining = remaining - 1
    end subroutine remove_current_node
 
@@ -243,43 +266,45 @@ contains
    subroutine find_starting_node(this, start_name)
       class(CircularList), intent(inout) :: this
       character(*), intent(in) :: start_name
-      type(node), pointer :: current
+      type(node), pointer :: current_ptr
       
-      if (.not. associated(this%head)) return
+      if (.not. allocated(this%head)) return
       
-      current => this%head
+      current_ptr => this%head
       do
-         if (current%equals(start_name)) then
-            this%current => current
+         if (current_ptr%equals(start_name)) then
+            if (allocated(this%current)) deallocate(this%current)
+            allocate(this%current, source=current_ptr)
             return
          end if
-         current => current%next
-         if (associated(current, this%head)) exit
+         current_ptr => current_ptr%next
+         if (associated(current_ptr, this%head)) exit
       end do
       
       !если имя не найдено, начинаем с первого
       write(*, '(a, a, a)') "Имя '", trim(start_name), "' не найдено. Начинаем с первого участника."
-      this%current => this%head
+      if (allocated(this%current)) deallocate(this%current)
+      allocate(this%current, source=this%head)
    end subroutine find_starting_node
 
    !вывод оставшихся участников
    subroutine print_remaining(this, count)
       class(CircularList), intent(in) :: this
       integer, intent(in) :: count
-      type(node), pointer :: current
+      type(node), pointer :: current_ptr
       integer :: i
       
       write(*, '(a, i0, a)') "Оставшиеся участники (", count, "):"
       write(*, '(a)', advance='no') "  "
       
-      current => this%current
+      current_ptr => this%current
       do i = 1, count
-         if (.not. associated(current)) exit  
-         call current%print(output_unit)    
+         if (.not. associated(current_ptr)) exit  
+         call current_ptr%print(output_unit)    
          if (i < count) then
             write(*, '(a)', advance='no') " -> "
          end if
-         current => current%next
+         current_ptr => current_ptr%next
       end do
       write(*, *)
    end subroutine print_remaining
@@ -296,7 +321,7 @@ contains
       write(Out, '(a)') "Результат игры в считалку:"
       write(Out, '(a)') ""
       
-      if (associated(this%current)) then
+      if (allocated(this%current)) then
          write(Out, '(a)') "Победитель:"
          write(Out, '(2x, a)') trim(this%current%name)
          write(Out, '(a)') ""
@@ -311,26 +336,28 @@ contains
    !очистка списка 
    subroutine clear_list(this)
       class(CircularList), intent(inout) :: this
-      type(node), pointer :: current_node, next_node
+      type(node), pointer :: current_ptr, next_ptr
       
-      if (.not. associated(this%head)) return
+      if (.not. allocated(this%head)) return
       
       !размыкаем кольцо и удаляем все узлы
-      current_node => this%head
-      next_node => current_node%next
+      current_ptr => this%head
+      next_ptr => current_ptr%next
       
-      !временно размыкаем кольцо, сделав его линейным
-      this%head%next => null()
+      !временно размыкаем кольцо
+      if (associated(current_ptr%next, this%head)) then
+         current_ptr%next => null()
+      end if
       
       !удаляем все узлы итеративно
-      do while (associated(current_node))
-         next_node => current_node%next
-         deallocate(current_node)
-         current_node => next_node
+      do while (associated(current_ptr))
+         next_ptr => current_ptr%next
+         deallocate(current_ptr)
+         current_ptr => next_ptr
       end do
       
-      this%head => null()
-      this%current => null()
+      if (allocated(this%head)) deallocate(this%head)
+      if (allocated(this%current)) deallocate(this%current)
       this%size = 0
    end subroutine clear_list
 
