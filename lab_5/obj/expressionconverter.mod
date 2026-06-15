@@ -1,4 +1,4 @@
-﻿!mod$ v1 sum:aa8b03127d670f4f
+﻿!mod$ v1 sum:24c0ace837aba100
 !need$ 5cbba2cdaa980ab0 n environment
 module expressionconverter
 use environment,only:event_type
@@ -121,6 +121,7 @@ character(:,1),allocatable,private::postfix_expr
 integer(4),private::pos
 logical(4),private::is_valid
 character(100_4,1),private::error_msg
+type(expr_node),pointer,private::root=>NULL()
 contains
 procedure::read_expression
 procedure::validate_and_convert
@@ -129,6 +130,7 @@ procedure,private::parse_expression
 procedure,private::to_postfix
 procedure,private::check_operand
 procedure,private::check_operator
+procedure,private::skip_spaces
 procedure,private::clear_tree
 final::converter_destructor
 end type
@@ -142,6 +144,9 @@ end
 subroutine print_node(this,unit)
 class(expr_node),intent(in)::this
 integer(4),intent(in)::unit
+end
+subroutine skip_spaces(this)
+class(expressionconverter),intent(inout)::this
 end
 subroutine read_expression(this,input_file)
 class(expressionconverter),intent(inout)::this

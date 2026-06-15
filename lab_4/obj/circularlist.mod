@@ -1,4 +1,4 @@
-﻿!mod$ v1 sum:8393402358a6b0be
+﻿!mod$ v1 sum:7721ea1d79ecc5f0
 !need$ 5cbba2cdaa980ab0 n environment
 module circularlist
 use environment,only:event_type
@@ -134,7 +134,6 @@ procedure::play_game
 procedure::output_result
 procedure,private::add_to_circular
 procedure,private::find_starting_node
-procedure,private::counting_game_recursive
 procedure,private::print_remaining
 procedure,private::clear_list
 final::circularlist_destructor
@@ -156,45 +155,37 @@ subroutine read_names(this,input_file)
 class(circularlist),intent(inout)::this
 character(*,1),intent(in)::input_file
 end
-recursive subroutine add_to_circular(this,name)
+subroutine add_to_circular(this,name)
 class(circularlist),intent(inout)::this
 character(*,1),intent(in)::name
-end
-recursive subroutine add_recursive(head,name)
-type(node),intent(in),pointer::head
-character(*,1),intent(in)::name
-end
-recursive subroutine close_circular(head)
-type(node),intent(in),pointer::head
 end
 subroutine play_game(this,start_name,m)
 class(circularlist),intent(inout)::this
 character(*,1),intent(in)::start_name
 integer(4),intent(in)::m
 end
-recursive subroutine counting_game_recursive(this,start_node,m,remaining)
+subroutine play_game_m1(this,remaining)
 class(circularlist),intent(inout)::this
-type(node),intent(in),pointer::start_node
-integer(4),intent(in)::m
-integer(4),intent(in)::remaining
+integer(4),intent(inout)::remaining
+end
+subroutine remove_current_node(this,prev,remaining)
+class(circularlist),intent(inout)::this
+type(node),intent(in),pointer::prev
+integer(4),intent(inout)::remaining
 end
 subroutine find_starting_node(this,start_name)
 class(circularlist),intent(inout)::this
 character(*,1),intent(in)::start_name
 end
-subroutine print_remaining(this,start_node,count)
+subroutine print_remaining(this,count)
 class(circularlist),intent(in)::this
-type(node),intent(in),pointer::start_node
 integer(4),intent(in)::count
 end
 subroutine output_result(this,output_file)
 class(circularlist),intent(in)::this
 character(*,1),intent(in)::output_file
 end
-recursive subroutine clear_list(this)
+subroutine clear_list(this)
 class(circularlist),intent(inout)::this
-end
-recursive subroutine clear_recursive(node_ptr)
-type(node),intent(inout),pointer::node_ptr
 end
 end

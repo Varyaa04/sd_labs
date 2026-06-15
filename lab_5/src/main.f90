@@ -1,4 +1,4 @@
-program prefix_to_postfix
+program main
    use Environment
    use ExpressionConverter
 
@@ -9,4 +9,4 @@ program prefix_to_postfix
    call converter%validate_and_convert()
    call converter%output_result("output.txt")
 
-end program prefix_to_postfix
+end program main

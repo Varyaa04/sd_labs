@@ -1,4 +1,4 @@
-﻿!mod$ v1 sum:649fc02325440505
+﻿!mod$ v1 sum:80e29aad0299a5e1
 !need$ 5cbba2cdaa980ab0 n environment
 module list_process
 use environment,only:event_type
@@ -180,7 +180,7 @@ subroutine delete_last_line_from_file(this,input_file)
 class(stringlist),intent(inout)::this
 character(*,1),intent(in)::input_file
 end
-recursive subroutine delete_all(this)
+subroutine delete_all(this)
 class(stringlist),intent(inout)::this
 end
 recursive subroutine delete_all_recursive(this,head,deleted_count)

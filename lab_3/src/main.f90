@@ -1,4 +1,4 @@
-program reference_lab_list
+program main
    use Environment
    use List_Process
 
@@ -11,4 +11,4 @@ program reference_lab_list
    call S%delete_all()
    call S%output("output.txt", "Список после удаления:", "append")
 
-end program reference_lab_list
+end program main

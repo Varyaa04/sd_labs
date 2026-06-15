@@ -34,6 +34,7 @@ module ExpressionConverter
       integer :: pos
       logical :: is_valid
       character(100) :: error_msg
+      type(expr_node), pointer :: root => null()  ! сохраняем корень для деструктора
    contains
       procedure, public :: read_expression
       procedure, public :: validate_and_convert
@@ -42,6 +43,7 @@ module ExpressionConverter
       procedure, private :: to_postfix
       procedure, private :: check_operand
       procedure, private :: check_operator
+      procedure, private :: skip_spaces
       procedure, private :: clear_tree
       final :: converter_destructor
    end type ExpressionConverter
@@ -53,10 +55,12 @@ module ExpressionConverter
 
 contains
 
-   ! завершаемая функция - автоматическое удаление дерева
+   ! деструктор - освобождает память дерева
    subroutine converter_destructor(this)
       type(ExpressionConverter), intent(inout) :: this
-      ! дерево будет очищено при необходимости
+      if (associated(this%root)) then
+         call this%clear_tree(this%root)
+      end if
    end subroutine converter_destructor
 
    ! реализация полиморфного метода print
@@ -66,6 +70,15 @@ contains
       write(unit, '(a)', advance='no') this%value
    end subroutine print_node
 
+   ! пропуск пробелов
+   subroutine skip_spaces(this)
+      class(ExpressionConverter), intent(inout) :: this
+      do while (this%pos <= len(this%prefix_expr) .and. &
+                this%prefix_expr(this%pos:this%pos) == ' ')
+         this%pos = this%pos + 1
+      end do
+   end subroutine skip_spaces
+
    ! чтение выражения из файла
    subroutine read_expression(this, input_file)
       class(ExpressionConverter), intent(inout) :: this
@@ -73,15 +86,32 @@ contains
       integer :: In, IO
       character(256) :: buffer
 
-      open (file=input_file, newunit=In, status='old', action='read')
+      ! очищаем предыдущее состояние
+      if (associated(this%root)) then
+         call this%clear_tree(this%root)
+         this%root => null()
+      end if
+      this%is_valid = .true.
+      this%error_msg = ""
+      this%postfix_expr = ""
+
+      open (file=input_file, newunit=In, status='old', action='read', iostat=IO)
+      if (IO /= 0) then
+         this%is_valid = .false.
+         this%error_msg = "Ошибка открытия файла"
+         return
+      end if
+      
       read (In, '(a)', iostat=IO) buffer
       close (In)
 
       if (IO == 0) then
          this%prefix_expr = trim(buffer)
+         if (len_trim(this%prefix_expr) == 0) then
+            this%is_valid = .false.
+            this%error_msg = "Пустое выражение"
+         end if
          this%pos = 1
-         this%is_valid = .true.
-         this%error_msg = ""
       else
          this%is_valid = .false.
          this%error_msg = "Ошибка чтения файла"
@@ -91,25 +121,37 @@ contains
    ! проверка корректности и преобразование
    subroutine validate_and_convert(this)
       class(ExpressionConverter), intent(inout) :: this
-      type(expr_node), pointer :: root
       
       if (.not. this%is_valid) return
       
       this%pos = 1
       this%postfix_expr = ""
       
+      ! очищаем предыдущее дерево
+      if (associated(this%root)) then
+         call this%clear_tree(this%root)
+         this%root => null()
+      end if
+      
       ! парсим выражение
-      call this%parse_expression(root)
+      call this%parse_expression(this%root)
       
       if (this%is_valid) then
+         ! проверяем, что вся строка разобрана
+         call this%skip_spaces()
+         if (this%pos <= len(this%prefix_expr)) then
+            this%is_valid = .false.
+            this%error_msg = "Лишние символы после выражения"
+            return
+         end if
+         
          ! преобразуем в постфиксную форму
-         call this%to_postfix(root)
-         call this%clear_tree(root)
+         call this%to_postfix(this%root)
       end if
       
    end subroutine validate_and_convert
 
-   ! рекурсивный парсинг выражения
+   ! рекурсивный парсинг выражения (префиксная нотация)
    recursive subroutine parse_expression(this, node)
       class(ExpressionConverter), intent(inout) :: this
       type(expr_node), pointer, intent(out) :: node
@@ -118,16 +160,11 @@ contains
       node => null()
       
       if (.not. this%is_valid) return
+      
+      call this%skip_spaces()
       if (this%pos > len(this%prefix_expr)) return
       
       ch = this%prefix_expr(this%pos:this%pos)
-      
-      ! проверка на пропуск пробелов
-      if (ch == ' ') then
-         this%pos = this%pos + 1
-         call this%parse_expression(node)
-         return
-      end if
       
       ! если это операнд (буква)
       if (this%check_operand(ch)) then
@@ -154,13 +191,13 @@ contains
          ! проверяем, что оба операнда существуют
          if (.not. associated(node%left) .or. .not. associated(node%right)) then
             this%is_valid = .false.
-            this%error_msg = "Недостаточно операндов для оператора"
+            this%error_msg = "Недостаточно операндов для оператора '" // ch // "'"
             return
          end if
          
       else
          this%is_valid = .false.
-         this%error_msg = "Некорректный символ: " // ch
+         this%error_msg = "Некорректный символ: '" // ch // "'"
          return
       end if
       
@@ -172,7 +209,8 @@ contains
       character(1), intent(in) :: ch
       logical :: res
       
-      res = (ch >= 'A' .and. ch <= 'Z')
+      ! можно расширить на строчные буквы и цифры
+      res = (ch >= 'A' .and. ch <= 'Z') .or. (ch >= 'a' .and. ch <= 'z')
    end function check_operand
 
    ! проверка, является ли символ оператором
@@ -186,7 +224,7 @@ contains
       do i = 1, size(OPERATORS)
          if (ch == OPERATORS(i)) then
             res = .true.
-            return
+            exit
          end if
       end do
    end function check_operator
@@ -199,15 +237,10 @@ contains
       if (.not. associated(node)) return
       
       ! постфиксная форма: левое поддерево, правое поддерево, корень
-      if (associated(node%left)) then
-         call this%to_postfix(node%left)
-      end if
+      call this%to_postfix(node%left)
+      call this%to_postfix(node%right)
       
-      if (associated(node%right)) then
-         call this%to_postfix(node%right)
-      end if
-      
-      ! добавляем текущий узел
+      ! добавляем текущий узел (без лишних пробелов)
       if (this%postfix_expr == "") then
          this%postfix_expr = node%value
       else
@@ -222,12 +255,8 @@ contains
       type(expr_node), pointer, intent(inout) :: node
       
       if (associated(node)) then
-         if (associated(node%left)) then
-            call this%clear_tree(node%left)
-         end if
-         if (associated(node%right)) then
-            call this%clear_tree(node%right)
-         end if
+         call this%clear_tree(node%left)
+         call this%clear_tree(node%right)
          deallocate(node)
          node => null()
       end if
@@ -239,7 +268,9 @@ contains
       character(*), intent(in) :: output_file
       integer :: Out
       
-      open (file=output_file, newunit=Out, action='write')
+      open (file=output_file, newunit=Out, action='write', iostat=Out)
+      if (Out /= 0) return
+      
       write(Out, '(a)') "Преобразование префиксной формы в постфиксную"
       write(Out, '(a)') ""
       write(Out, '(a)') "Исходное выражение (префиксная форма):"
