@@ -103,6 +103,7 @@ contains
       close (Out)
    end subroutine output
 
+
    !рекурсивный вывод 
    recursive subroutine output_recursive(this, unit, current)
       class(StringList), intent(in) :: this

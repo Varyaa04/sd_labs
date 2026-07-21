@@ -265,10 +265,10 @@ contains
    subroutine output_result(this, output_file)
       class(ExpressionConverter), intent(in) :: this
       character(*), intent(in) :: output_file
-      integer :: Out
+      integer :: Out, IO
       
-      open (file=output_file, newunit=Out, action='write', iostat=Out)
-      if (Out /= 0) return
+      open (file=output_file, newunit=Out, action='write', iostat=IO)
+      if (IO /= 0) return
       
       write(Out, '(a)') "Преобразование префиксной формы в постфиксную"
       write(Out, '(a)') ""

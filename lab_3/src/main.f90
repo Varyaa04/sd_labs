@@ -11,4 +11,5 @@ program main
    call S%delete_all()
    call S%output("output.txt", "Список после удаления:", "append")
 
+
 end program main
