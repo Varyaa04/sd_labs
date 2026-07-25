@@ -1,4 +1,4 @@
-﻿!mod$ v1 sum:d10535c57a475e03
+﻿!mod$ v1 sum:83fe8592c7534c3d
 !need$ 5cbba2cdaa980ab0 n environment
 module circularlist
 use environment,only:event_type
@@ -111,6 +111,7 @@ procedure::output_result
 procedure,private::add_to_circular
 procedure,private::find_starting_node
 procedure,private::print_remaining
+procedure,private::print_full_list
 procedure,private::remove_current
 procedure,private::next_index
 procedure,private::ensure_capacity
@@ -144,6 +145,11 @@ end
 recursive subroutine print_remaining(this,count,idx,printed)
 class(circularlist),intent(in)::this
 integer(4),intent(in)::count
+integer(4),intent(in)::idx
+integer(4),intent(inout)::printed
+end
+recursive subroutine print_full_list(this,idx,printed)
+class(circularlist),intent(in)::this
 integer(4),intent(in)::idx
 integer(4),intent(inout)::printed
 end
