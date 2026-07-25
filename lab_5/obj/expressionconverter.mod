@@ -1,4 +1,4 @@
-﻿!mod$ v1 sum:c4bf9b12e728e03d
+﻿!mod$ v1 sum:628e9b2fdebec070
 !need$ 5cbba2cdaa980ab0 n environment
 module expressionconverter
 use environment,only:event_type
@@ -96,23 +96,10 @@ use environment,only:operator(//)
 use environment,only:int_plus_string
 use environment,only:string_plus_int
 use environment,only:handle_io_status
-type,abstract::base_node
-contains
-procedure(print_interface),deferred,pass::print
-end type
-abstract interface
-subroutine print_interface(this,unit)
-import::base_node
-class(base_node),intent(in)::this
-integer(4),intent(in)::unit
-end
-end interface
-type,extends(base_node)::expr_node
+type::expr_node
 character(1_4,1)::value
 type(expr_node),allocatable::left
 type(expr_node),allocatable::right
-contains
-procedure,pass::print=>print_node
 end type
 type::expressionconverter
 character(:,1),allocatable,private::prefix_expr
@@ -127,23 +114,14 @@ procedure::validate_and_convert
 procedure::output_result
 procedure,private::parse_expression
 procedure,private::to_postfix
-procedure,private::check_operand
 procedure,private::check_operator
 procedure,private::skip_spaces
 procedure,private::clear_tree
-final::converter_destructor
 end type
 character(1_4,1),parameter::operators(1_8:4_8)=[CHARACTER(KIND=1,LEN=1)::"+","-","*","/"]
 character(1_4,1),parameter::open_paren="("
 character(1_4,1),parameter::close_paren=")"
 contains
-subroutine converter_destructor(this)
-type(expressionconverter),intent(inout)::this
-end
-subroutine print_node(this,unit)
-class(expr_node),intent(in)::this
-integer(4),intent(in)::unit
-end
 subroutine skip_spaces(this)
 class(expressionconverter),intent(inout)::this
 end
@@ -157,11 +135,6 @@ end
 recursive subroutine parse_expression(this,node)
 class(expressionconverter),intent(inout)::this
 type(expr_node),allocatable,intent(out)::node
-end
-function check_operand(this,ch) result(res)
-class(expressionconverter),intent(in)::this
-character(1_4,1),intent(in)::ch
-logical(4)::res
 end
 function check_operator(this,ch) result(res)
 class(expressionconverter),intent(in)::this

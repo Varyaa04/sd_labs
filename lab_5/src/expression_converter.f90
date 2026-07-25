@@ -3,27 +3,11 @@ module ExpressionConverter
 
    implicit none
 
-   ! базовый абстрактный тип для узла
-   type, public, abstract :: base_node
-   contains
-      procedure(print_interface), deferred, pass :: print
-   end type base_node
-
-   abstract interface
-      subroutine print_interface(this, unit)
-         import base_node
-         class(base_node), intent(in) :: this
-         integer, intent(in) :: unit
-      end subroutine print_interface
-   end interface
-
    ! рекурсивный производный тип узла выражения
-   type, extends(base_node), public :: expr_node
+   type, public :: expr_node
       character(1) :: value
       type(expr_node), allocatable :: left
       type(expr_node), allocatable :: right
-   contains
-      procedure, pass :: print => print_node
    end type expr_node
 
    ! инкапсулирующий тип для конвертера выражений
@@ -41,11 +25,9 @@ module ExpressionConverter
       procedure, public :: output_result
       procedure, private :: parse_expression
       procedure, private :: to_postfix
-      procedure, private :: check_operand
       procedure, private :: check_operator
       procedure, private :: skip_spaces
       procedure, private :: clear_tree
-      final :: converter_destructor
    end type ExpressionConverter
 
    ! символы операций
@@ -54,20 +36,6 @@ module ExpressionConverter
    character(1), parameter :: CLOSE_PAREN = ')'
 
 contains
-
-   ! деструктор - освобождает память дерева
-   subroutine converter_destructor(this)
-      type(ExpressionConverter), intent(inout) :: this
-      if (allocated(this%root)) call this%clear_tree(this%root)
-   end subroutine converter_destructor
-
-   ! реализация полиморфного метода print
-   subroutine print_node(this, unit)
-      class(expr_node), intent(in) :: this
-      integer, intent(in) :: unit
-      write(unit, '(a)', advance='no') this%value
-   end subroutine print_node
-
    ! пропуск пробелов
    subroutine skip_spaces(this)
       class(ExpressionConverter), intent(inout) :: this
@@ -146,6 +114,7 @@ contains
       class(ExpressionConverter), intent(inout) :: this
       type(expr_node), allocatable, intent(out) :: node
       character(1) :: ch
+      logical :: is_operand
 
       if (this%is_valid) then
 
@@ -154,8 +123,11 @@ contains
          ch = this%prefix_expr(this%pos:this%pos)
       end if
       
+      ! проверяем, является ли символ операндом (буква)
+      is_operand = (ch >= 'A' .and. ch <= 'Z') .or. (ch >= 'a' .and. ch <= 'z')
+      
       ! если это операнд
-      if (this%check_operand(ch)) then
+      if (is_operand) then
          allocate(node)
          node%value = ch
          this%pos = this%pos + 1
@@ -186,15 +158,6 @@ contains
       end if
       
    end subroutine parse_expression
-
-   ! проверка, является ли символ операндом 
-   function check_operand(this, ch) result(res)
-      class(ExpressionConverter), intent(in) :: this
-      character(1), intent(in) :: ch
-      logical :: res
-      
-      res = (ch >= 'A' .and. ch <= 'Z') .or. (ch >= 'a' .and. ch <= 'z')
-   end function check_operand
 
    ! проверка, является ли символ оператором
    function check_operator(this, ch) result(res)
@@ -237,6 +200,7 @@ contains
       if (allocated(node)) then
          call this%clear_tree(node%left)
          call this%clear_tree(node%right)
+         deallocate(node)
       end if
    end subroutine clear_tree
 
