@@ -2,44 +2,20 @@ module CircularList
    use Environment
    implicit none
 
-   private
    public :: CircularList
 
-   ! Базовый абстрактный узел
-   type, abstract, public :: base_node
-   contains
-      procedure(print_interface), deferred, pass :: print
-      procedure(equals_interface), deferred, pass :: equals
-   end type base_node
-
-   abstract interface
-      subroutine print_interface(this, unit)
-         import :: base_node
-         class(base_node), intent(in) :: this
-         integer, intent(in) :: unit
-      end subroutine
-      logical function equals_interface(this, name)
-         import :: base_node
-         class(base_node), intent(in) :: this
-         character(*), intent(in) :: name
-      end function
-   end interface
-
-   ! Конкретный узел
-   type, extends(base_node), public :: node
+   ! Узел списка
+   type, public :: node
       character(:), allocatable :: name
-      type(node), pointer :: next => null()
-   contains
-      procedure, pass :: print => print_node
-      procedure, pass :: equals => node_equals
+      logical :: active = .true.
    end type node
 
    ! Основной тип
    type :: CircularList
       private
-      type(node), pointer :: head => null()
-      type(node), pointer :: current => null()
-      integer :: size = 0
+      type(node), allocatable :: nodes(:)
+      integer :: size = 0      ! сколько узлов реально добавлено 
+      integer :: current = 0   ! индекс текущего узла в nodes
    contains
       procedure :: read_names
       procedure :: play_game
@@ -47,62 +23,65 @@ module CircularList
       procedure, private :: add_to_circular
       procedure, private :: find_starting_node
       procedure, private :: print_remaining
-      procedure, private :: clear_list
       procedure, private :: remove_current
-      final :: circularlist_destructor
+      procedure, private :: next_index
+      procedure, private :: ensure_capacity
    end type CircularList
 
 contains
 
-   subroutine circularlist_destructor(this)
-      type(CircularList), intent(inout) :: this
-      call this%clear_list()
-   end subroutine
-
-   subroutine print_node(this, unit)
-      class(node), intent(in) :: this
-      integer, intent(in) :: unit
-      write(unit, '(a)', advance='no') trim(this%name)
-   end subroutine
-
-   logical function node_equals(this, name)
-      class(node), intent(in) :: this
-      character(*), intent(in) :: name
-      node_equals = (this%name == name)
-   end function
-
-   ! ==================== РЕКУРСИВНЫЕ ОПЕРАЦИИ ====================
-
-   ! Хвостовая рекурсия: добавление в конец (поддержание кольца)
-   recursive subroutine add_to_circular(this, name, curr)
+   ! Увеличивает ёмкость массива nodes при необходимости
+   subroutine ensure_capacity(this)
       class(CircularList), intent(inout) :: this
-      character(*), intent(in) :: name
-      type(node), pointer, optional :: curr
-      type(node), pointer :: new_node
+      type(node), allocatable :: tmp(:)
+      integer :: new_cap
 
-      if (.not. associated(this%head)) then
-         allocate(this%head)
-         this%head%name = name
-         this%head%next => this%head
-         this%current => this%head
-         this%size = 1
+      if (.not. allocated(this%nodes)) then
+         allocate(this%nodes(8))
          return
       end if
 
-      if (present(curr)) then
-         if (associated(curr%next, this%head)) then  ! нашли конец
-            allocate(new_node)
-            new_node%name = name
-            new_node%next => this%head
-            curr%next => new_node
-            this%size = this%size + 1
+      if (this%size < size(this%nodes)) return
+
+      new_cap = size(this%nodes) * 2
+      allocate(tmp(new_cap))
+      tmp(1:this%size) = this%nodes(1:this%size)
+      call move_alloc(tmp, this%nodes)
+   end subroutine ensure_capacity
+
+   ! Добавление в конец 
+   subroutine add_to_circular(this, name)
+      class(CircularList), intent(inout) :: this
+      character(*), intent(in) :: name
+
+      call this%ensure_capacity()
+      this%size = this%size + 1
+      this%nodes(this%size)%name = name
+      this%nodes(this%size)%active = .true.
+
+      if (this%size == 1) this%current = 1
+   end subroutine add_to_circular
+
+   ! Индекс следующего активного узла после idx, по кругу
+   function next_index(this, idx) result(res)
+      class(CircularList), intent(in) :: this
+      integer, intent(in) :: idx
+      integer :: res, j
+
+      j = idx
+      do
+         j = j + 1
+         if (j > this%size) j = 1
+         if (this%nodes(j)%active) then
+            res = j
             return
          end if
-         call add_to_circular(this, name, curr%next)  ! хвостовая рекурсия
-      else
-         call add_to_circular(this, name, this%head)
-      end if
-   end subroutine add_to_circular
+         if (j == idx) then   ! обошли круг, активных не осталось
+            res = idx
+            return
+         end if
+      end do
+   end function next_index
 
    subroutine read_names(this, input_file)
       class(CircularList), intent(inout) :: this
@@ -110,7 +89,9 @@ contains
       integer :: In, IO
       character(100) :: buffer
 
-      call this%clear_list()
+      if (allocated(this%nodes)) deallocate(this%nodes)
+      this%size = 0
+      this%current = 0
 
       open(file=input_file, newunit=In, status='old', action='read', iostat=IO)
       if (IO /= 0) return
@@ -127,57 +108,51 @@ contains
    end subroutine
 
    ! Поиск стартового узла (хвостовая рекурсия)
-   recursive subroutine find_starting_node(this, start_name, curr)
+   recursive subroutine find_starting_node(this, start_name, idx)
       class(CircularList), intent(inout) :: this
       character(*), intent(in) :: start_name
-      type(node), pointer, optional :: curr
+      integer, intent(in), optional :: idx
+      integer :: j
 
-      if (.not. associated(this%head)) return
+      if (this%size == 0) return
 
-      if (present(curr)) then
-         if (curr%equals(start_name)) then
-            this%current => curr
-            return
-         end if
-         if (associated(curr%next, this%head)) then  ! обошли круг
-            this%current => this%head
-            write(*, '(a,a,a)') "Имя '", trim(start_name), "' не найдено. Начинаем с первого."
-            return
-         end if
-         call find_starting_node(this, start_name, curr%next)
-      else
-         call find_starting_node(this, start_name, this%head)
+      j = 1
+      if (present(idx)) j = idx
+
+      if (this%nodes(j)%active .and. this%nodes(j)%name == start_name) then
+         this%current = j
+         return
       end if
+
+      if (j >= this%size) then  ! обошли весь массив, не нашли
+         this%current = 1
+         write(*, '(a,a,a)') "Имя '", trim(start_name), "' не найдено. Начинаем с первого."
+         return
+      end if
+
+      call this%find_starting_node(start_name, j + 1)
    end subroutine find_starting_node
 
-   ! Удаление текущего узла (рекурсивный вариант с prev)
-   recursive subroutine remove_current(this, prev, remaining)
+   ! Удаление текущего узла
+   subroutine remove_current(this, remaining)
       class(CircularList), intent(inout) :: this
-      type(node), pointer :: prev
       integer, intent(inout) :: remaining
-      type(node), pointer :: to_remove
+      integer :: nxt
 
-      write(*, '(a, a)') "Выбывает: ", trim(this%current%name)
+      write(*, '(a, a)') "Выбывает: ", trim(this%nodes(this%current)%name)
 
-      to_remove => this%current
-
-      prev%next => to_remove%next
-
-      if (associated(to_remove, this%head)) then
-         this%head => to_remove%next
-      end if
-
-      this%current => to_remove%next
-
-      deallocate(to_remove)
+      nxt = this%next_index(this%current)
+      this%nodes(this%current)%active = .false.
       remaining = remaining - 1
+
+      this%current = nxt
    end subroutine remove_current
 
    ! Печать оставшихся (хвостовая рекурсия)
-   recursive subroutine print_remaining(this, count, curr, printed)
+   recursive subroutine print_remaining(this, count, idx, printed)
       class(CircularList), intent(in) :: this
       integer, intent(in) :: count
-      type(node), pointer, intent(in) :: curr
+      integer, intent(in) :: idx
       integer, intent(inout) :: printed
 
       if (printed >= count) then
@@ -190,12 +165,12 @@ contains
          write(*, '(a)', advance='no') "  "
       end if
 
-      call curr%print(output_unit)
+      write(*, '(a)', advance='no') trim(this%nodes(idx)%name)
       printed = printed + 1
 
       if (printed < count) write(*, '(a)', advance='no') " -> "
 
-      call print_remaining(this, count, curr%next, printed)
+      call this%print_remaining(count, this%next_index(idx), printed)
    end subroutine print_remaining
 
    ! Основная игра
@@ -203,8 +178,7 @@ contains
       class(CircularList), intent(inout) :: this
       character(*), intent(in) :: start_name
       integer, intent(in) :: m
-      integer :: remaining, i, printed
-      type(node), pointer :: prev, to_count
+      integer :: remaining, i, printed, idx
 
       if (this%size == 0) then
          write(*, '(a)') "Нет участников!"
@@ -223,17 +197,15 @@ contains
       write(*, *)
 
       do while (remaining > 1)
-         prev => this%current
-         to_count => this%current
+         idx = this%current
 
-         ! Отсчитываем m-1 шагов (можно сделать рекурсивно, но для ясности цикл)
-         do i = 1, m-1
-            prev => to_count
-            to_count => to_count%next
+         ! Отсчитываем m-1 шагов
+         do i = 1, m - 1
+            idx = this%next_index(idx)
          end do
 
-         this%current => to_count
-         call this%remove_current(prev, remaining)
+         this%current = idx
+         call this%remove_current(remaining)
 
          if (remaining > 0) then
             printed = 0
@@ -243,7 +215,7 @@ contains
       end do
 
       write(*, '(a)') "Последний оставшийся участник:"
-      write(*, '(2x,a)') trim(this%current%name)
+      write(*, '(2x,a)') trim(this%nodes(this%current)%name)
       write(*, *)
    end subroutine play_game
 
@@ -257,36 +229,14 @@ contains
 
       write(Out, '(a)') "Результат игры в считалку:"
       write(Out, '(a)') ""
-      if (associated(this%current)) then
+      if (this%current > 0) then
          write(Out, '(a)') "Победитель:"
-         write(Out, '(2x,a)') trim(this%current%name)
+         write(Out, '(2x,a)') trim(this%nodes(this%current)%name)
          write(Out, '(a,i0)') "Всего участников было: ", this%size
       else
          write(Out, '(a)') "Нет участников"
       end if
       close(Out)
-   end subroutine
-
-   subroutine clear_list(this)
-      class(CircularList), intent(inout) :: this
-      type(node), pointer :: curr, nextn
-
-      if (.not. associated(this%head)) return
-
-      ! Размыкаем кольцо
-      curr => this%head%next
-      this%head%next => null()
-
-      do while (associated(curr))
-         nextn => curr%next
-         deallocate(curr)
-         curr => nextn
-      end do
-
-      deallocate(this%head)
-      this%head => null()
-      this%current => null()
-      this%size = 0
    end subroutine
 
 end module CircularList

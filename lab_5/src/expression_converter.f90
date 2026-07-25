@@ -20,8 +20,8 @@ module ExpressionConverter
    ! рекурсивный производный тип узла выражения
    type, extends(base_node), public :: expr_node
       character(1) :: value
-      type(expr_node), pointer :: left => null()
-      type(expr_node), pointer :: right => null()
+      type(expr_node), allocatable :: left
+      type(expr_node), allocatable :: right
    contains
       procedure, pass :: print => print_node
    end type expr_node
@@ -34,7 +34,7 @@ module ExpressionConverter
       integer :: pos
       logical :: is_valid
       character(100) :: error_msg
-      type(expr_node), pointer :: root => null()  ! сохраняем корень для деструктора
+      type(expr_node), allocatable :: root  ! сохраняем корень для деструктора
    contains
       procedure, public :: read_expression
       procedure, public :: validate_and_convert
@@ -58,7 +58,7 @@ contains
    ! деструктор - освобождает память дерева
    subroutine converter_destructor(this)
       type(ExpressionConverter), intent(inout) :: this
-      if (associated(this%root)) then
+      if (allocated(this%root)) then
          call this%clear_tree(this%root)
       end if
    end subroutine converter_destructor
@@ -87,9 +87,8 @@ contains
       character(256) :: buffer
 
       ! очищаем предыдущее состояние
-      if (associated(this%root)) then
+      if (allocated(this%root)) then
          call this%clear_tree(this%root)
-         this%root => null()
       end if
       this%is_valid = .true.
       this%error_msg = ""
@@ -128,9 +127,8 @@ contains
       this%postfix_expr = ""
       
       ! очищаем предыдущее дерево
-      if (associated(this%root)) then
+      if (allocated(this%root)) then
          call this%clear_tree(this%root)
-         this%root => null()
       end if
       
       ! парсим выражение
@@ -154,10 +152,8 @@ contains
    ! рекурсивный парсинг выражения
    recursive subroutine parse_expression(this, node)
       class(ExpressionConverter), intent(inout) :: this
-      type(expr_node), pointer, intent(out) :: node
+      type(expr_node), allocatable, intent(out) :: node
       character(1) :: ch
-      
-      node => null()
       
       if (.not. this%is_valid) return
       
@@ -170,8 +166,6 @@ contains
       if (this%check_operand(ch)) then
          allocate(node)
          node%value = ch
-         node%left => null()
-         node%right => null()
          this%pos = this%pos + 1
          
       ! если это оператор
@@ -189,7 +183,7 @@ contains
          if (.not. this%is_valid) return
          
          ! проверяем, что оба операнда существуют
-         if (.not. associated(node%left) .or. .not. associated(node%right)) then
+         if (.not. allocated(node%left) .or. .not. allocated(node%right)) then
             this%is_valid = .false.
             this%error_msg = "Недостаточно операндов для оператора '" // ch // "'"
             return
@@ -231,9 +225,9 @@ contains
    ! рекурсивное преобразование в постфиксную форму
    recursive subroutine to_postfix(this, node)
       class(ExpressionConverter), intent(inout) :: this
-      type(expr_node), pointer, intent(in) :: node
+      type(expr_node), allocatable, intent(in) :: node
       
-      if (.not. associated(node)) return
+      if (.not. allocated(node)) return
       
       ! постфиксная форма: левое поддерево, правое поддерево, корень
       call this%to_postfix(node%left)
@@ -251,13 +245,12 @@ contains
    ! рекурсивная очистка дерева
    recursive subroutine clear_tree(this, node)
       class(ExpressionConverter), intent(inout) :: this
-      type(expr_node), pointer, intent(inout) :: node
+      type(expr_node), allocatable, intent(inout) :: node
       
-      if (associated(node)) then
+      if (allocated(node)) then
          call this%clear_tree(node%left)
          call this%clear_tree(node%right)
          deallocate(node)
-         node => null()
       end if
    end subroutine clear_tree
 

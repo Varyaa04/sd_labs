@@ -1,4 +1,4 @@
-﻿!mod$ v1 sum:24c0ace837aba100
+﻿!mod$ v1 sum:c4bf9b12e728e03d
 !need$ 5cbba2cdaa980ab0 n environment
 module expressionconverter
 use environment,only:event_type
@@ -109,19 +109,18 @@ end
 end interface
 type,extends(base_node)::expr_node
 character(1_4,1)::value
-type(expr_node),pointer::left=>NULL()
-type(expr_node),pointer::right=>NULL()
+type(expr_node),allocatable::left
+type(expr_node),allocatable::right
 contains
 procedure,pass::print=>print_node
 end type
-intrinsic::null
 type::expressionconverter
 character(:,1),allocatable,private::prefix_expr
 character(:,1),allocatable,private::postfix_expr
 integer(4),private::pos
 logical(4),private::is_valid
 character(100_4,1),private::error_msg
-type(expr_node),pointer,private::root=>NULL()
+type(expr_node),allocatable,private::root
 contains
 procedure::read_expression
 procedure::validate_and_convert
@@ -157,7 +156,7 @@ class(expressionconverter),intent(inout)::this
 end
 recursive subroutine parse_expression(this,node)
 class(expressionconverter),intent(inout)::this
-type(expr_node),intent(out),pointer::node
+type(expr_node),allocatable,intent(out)::node
 end
 function check_operand(this,ch) result(res)
 class(expressionconverter),intent(in)::this
@@ -171,11 +170,11 @@ logical(4)::res
 end
 recursive subroutine to_postfix(this,node)
 class(expressionconverter),intent(inout)::this
-type(expr_node),intent(in),pointer::node
+type(expr_node),allocatable,intent(in)::node
 end
 recursive subroutine clear_tree(this,node)
 class(expressionconverter),intent(inout)::this
-type(expr_node),intent(inout),pointer::node
+type(expr_node),allocatable,intent(inout)::node
 end
 subroutine output_result(this,output_file)
 class(expressionconverter),intent(in)::this
