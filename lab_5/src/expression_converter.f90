@@ -58,9 +58,7 @@ contains
    ! деструктор - освобождает память дерева
    subroutine converter_destructor(this)
       type(ExpressionConverter), intent(inout) :: this
-      if (allocated(this%root)) then
-         call this%clear_tree(this%root)
-      end if
+      if (allocated(this%root)) call this%clear_tree(this%root)
    end subroutine converter_destructor
 
    ! реализация полиморфного метода print
@@ -87,9 +85,7 @@ contains
       character(256) :: buffer
 
       ! очищаем предыдущее состояние
-      if (allocated(this%root)) then
-         call this%clear_tree(this%root)
-      end if
+      if (allocated(this%root)) call this%clear_tree(this%root)
       this%is_valid = .true.
       this%error_msg = ""
       this%postfix_expr = ""
@@ -121,13 +117,12 @@ contains
       class(ExpressionConverter), intent(inout) :: this
       
       if (this%is_valid) then
+         
          this%pos = 1
          this%postfix_expr = ""
          
          ! очищаем предыдущее дерево
-         if (allocated(this%root)) then
-            call this%clear_tree(this%root)
-         end if
+         if (allocated(this%root)) call this%clear_tree(this%root)
          
          ! парсим выражение
          call this%parse_expression(this%root)
@@ -144,7 +139,6 @@ contains
             end if
          end if
       end if
-      
    end subroutine validate_and_convert
 
    ! рекурсивный парсинг выражения
@@ -152,43 +146,43 @@ contains
       class(ExpressionConverter), intent(inout) :: this
       type(expr_node), allocatable, intent(out) :: node
       character(1) :: ch
-      
+
       if (this%is_valid) then
+
          call this%skip_spaces()
-         if (this%pos <= len(this%prefix_expr)) then
-            ch = this%prefix_expr(this%pos:this%pos)
-            
-            ! если это операнд
-            if (this%check_operand(ch)) then
-               allocate(node)
-               node%value = ch
-               this%pos = this%pos + 1
-               
-            ! если это оператор
-            else if (this%check_operator(ch)) then
-               allocate(node)
-               node%value = ch
-               this%pos = this%pos + 1
-               
-               ! парсим левый операнд
-               call this%parse_expression(node%left)
-               if (this%is_valid) then
-                  ! парсим правый операнд
-                  call this%parse_expression(node%right)
-                  if (this%is_valid) then
-                     ! проверяем, что оба операнда существуют
-                     if (.not. allocated(node%left) .or. .not. allocated(node%right)) then
-                        this%is_valid = .false.
-                        this%error_msg = "Недостаточно операндов для оператора '" // ch // "'"
-                     end if
-                  end if
+
+         ch = this%prefix_expr(this%pos:this%pos)
+      end if
+      
+      ! если это операнд
+      if (this%check_operand(ch)) then
+         allocate(node)
+         node%value = ch
+         this%pos = this%pos + 1
+         
+      ! если это оператор
+      else if (this%check_operator(ch)) then
+         allocate(node)
+         node%value = ch
+         this%pos = this%pos + 1
+         
+         ! парсим левый операнд
+         call this%parse_expression(node%left)
+         if (this%is_valid) then
+            ! парсим правый операнд
+            call this%parse_expression(node%right)
+            if (this%is_valid) then
+               ! проверяем, что оба операнда существуют
+               if (.not. allocated(node%left) .or. .not. allocated(node%right)) then
+                  this%is_valid = .false.
+                  this%error_msg = "Недостаточно операндов для оператора '" // ch // "'"
                end if
-               
-            else
-               this%is_valid = .false.
-               this%error_msg = "Некорректный символ: '" // ch // "'"
             end if
          end if
+         
+      else
+         this%is_valid = .false.
+         this%error_msg = "Некорректный символ: '" // ch // "'"
       end if
       
    end subroutine parse_expression
@@ -213,7 +207,6 @@ contains
       do i = 1, size(OPERATORS)
          if (ch == OPERATORS(i)) then
             res = .true.
-            exit
          end if
       end do
    end function check_operator
@@ -224,11 +217,9 @@ contains
       type(expr_node), allocatable, intent(in) :: node
       
       if (allocated(node)) then
-         ! постфиксная форма: левое поддерево, правое поддерево, корень
          call this%to_postfix(node%left)
          call this%to_postfix(node%right)
          
-         ! добавляем текущий узел
          if (this%postfix_expr == "") then
             this%postfix_expr = node%value
          else
@@ -246,7 +237,6 @@ contains
       if (allocated(node)) then
          call this%clear_tree(node%left)
          call this%clear_tree(node%right)
-         deallocate(node)
       end if
    end subroutine clear_tree
 
@@ -261,17 +251,17 @@ contains
          write(Out, '(a)') "Преобразование префиксной формы в постфиксную"
          write(Out, '(a)') ""
          write(Out, '(a)') "Исходное выражение (префиксная форма):"
-         write(Out, '(2x, a)') (this%prefix_expr)
+         write(Out, '(2x, a)') this%prefix_expr
          write(Out, '(a)') ""
          
          if (this%is_valid) then
             write(Out, '(a)') "Результат (постфиксная форма):"
-            write(Out, '(2x, a)') (this%postfix_expr)
+            write(Out, '(2x, a)') this%postfix_expr
             write(Out, '(a)') ""
             write(Out, '(a)') "Проверка: выражение корректно"
          else
             write(Out, '(a)') "ОШИБКА:"
-            write(Out, '(2x, a)') (this%error_msg)
+            write(Out, '(2x, a)') this%error_msg
          end if
          
          close(Out)

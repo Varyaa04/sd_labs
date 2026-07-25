@@ -37,12 +37,8 @@ contains
       type(node), allocatable :: tmp(:)
       integer :: new_cap
 
-      if (.not. allocated(this%nodes)) then
-         allocate(this%nodes(8))
-      else if (this%size < size(this%nodes)) then
-         ! ничего не делаем
-      else
-         new_cap = size(this%nodes) * 2
+      if (this%size == size(this%nodes)) then
+         new_cap = max(8, size(this%nodes) * 2)
          allocate(tmp(new_cap))
          tmp(1:this%size) = this%nodes(1:this%size)
          call move_alloc(tmp, this%nodes)
@@ -62,25 +58,33 @@ contains
       if (this%size == 1) this%current = 1
    end subroutine add_to_circular
 
-   ! Индекс следующего активного узла после idx, по кругу
+   ! Индекс следующего активного узла по кругу
    function next_index(this, idx) result(res)
       class(CircularList), intent(in) :: this
       integer, intent(in) :: idx
       integer :: res, j
+      logical :: found
 
-      j = idx
-      do
-         j = j + 1
-         if (j > this%size) j = 1
-         if (this%nodes(j)%active) then
-            res = j
-            exit
-         end if
-         if (j == idx) then   ! обошли круг, активных не осталось
-            res = idx
-            exit
-         end if
-      end do
+      if (this%size == 0) then
+         res = 0
+      else
+         j = idx
+         found = .false.
+         
+         ! Проверяем, есть ли активные узлы
+         do while (.not. found)
+            j = j + 1
+            if (j > this%size) j = 1
+            if (this%nodes(j)%active) then
+               res = j
+               found = .true.
+            end if
+            if (j == idx) then   ! обошли круг, активных не осталось
+               res = idx
+               found = .true.
+            end if
+         end do
+      end if
    end function next_index
 
    subroutine read_names(this, input_file)
@@ -88,43 +92,51 @@ contains
       character(*), intent(in) :: input_file
       integer :: In, IO
       character(100) :: buffer
+      logical :: end_of_file
 
-      if (allocated(this%nodes)) deallocate(this%nodes)
       this%size = 0
       this%current = 0
 
       open(file=input_file, newunit=In, status='old', action='read', iostat=IO)
       if (IO == 0) then
-         do
+         end_of_file = .false.
+         do while (.not. end_of_file)
             read(In, '(a)', iostat=IO) buffer
-            if (IO /= 0) exit
-            buffer = adjustl(buffer)
-            if (len_trim(buffer) > 0) then
-               call this%add_to_circular(buffer)
+            if (IO /= 0) then
+               end_of_file = .true.
+            else
+               buffer = adjustl(buffer)
+               if (len_trim(buffer) > 0) call this%add_to_circular(buffer)
             end if
          end do
          close(In)
       end if
    end subroutine
 
-   ! Поиск стартового узла (хвостовая рекурсия)
-   recursive subroutine find_starting_node(this, start_name, idx)
+   ! Поиск стартового узла 
+   subroutine find_starting_node(this, start_name)
       class(CircularList), intent(inout) :: this
       character(*), intent(in) :: start_name
-      integer, intent(in), optional :: idx
       integer :: j
+      logical :: found
 
-      if (this%size > 0) then
+      if (this%size == 0) then
+         this%current = 0
+      else
+         found = .false.
          j = 1
-         if (present(idx)) j = idx
+         do while (j <= this%size .and. .not. found)
+            if (this%nodes(j)%active .and. this%nodes(j)%name == start_name) then
+               this%current = j
+               found = .true.
+            end if
+            j = j + 1
+         end do
 
-         if (this%nodes(j)%active .and. this%nodes(j)%name == start_name) then
-            this%current = j
-         else if (j >= this%size) then  ! обошли весь массив, не нашли
+         if (.not. found) then
+            ! Не нашли - начинаем с первого
             this%current = 1
             write(*, '(a,a,a)') "Имя '", start_name, "' не найдено. Начинаем с первого."
-         else
-            call this%find_starting_node(start_name, j + 1)
          end if
       end if
    end subroutine find_starting_node
@@ -135,62 +147,67 @@ contains
       integer, intent(inout) :: remaining
       integer :: nxt
 
-      write(*, '(a, a)') "Выбывает: ", this%nodes(this%current)%name
+      if (this%current /= 0) then
+         write(*, '(a, a)') "Выбывает: ", this%nodes(this%current)%name
 
-      nxt = this%next_index(this%current)
-      this%nodes(this%current)%active = .false.
-      remaining = remaining - 1
+         nxt = this%next_index(this%current)
+         this%nodes(this%current)%active = .false.
+         remaining = remaining - 1
 
-      this%current = nxt
+         this%current = nxt
+      end if
    end subroutine remove_current
 
-   ! Печать оставшихся (хвостовая рекурсия)
-   recursive subroutine print_remaining(this, count, idx, printed)
+   ! Печать оставшихся 
+   subroutine print_remaining(this, count)
       class(CircularList), intent(in) :: this
       integer, intent(in) :: count
-      integer, intent(in) :: idx
-      integer, intent(inout) :: printed
+      integer :: idx, printed
 
-      if (printed < count) then
-         if (printed == 0) then
-            write(*, '(a, i0, a)') "Оставшиеся участники (", count, "):"
-            write(*, '(a)', advance='no') "  "
-         end if
+      if (count == 0 .or. this%current == 0) then
+         write(*, '(a)') "Нет оставшихся участников"
+      else
+         write(*, '(a, i0, a)') "Оставшиеся участники (", count, "):"
+         write(*, '(a)', advance='no') "  "
 
-         write(*, '(a)', advance='no') this%nodes(idx)%name
-         printed = printed + 1
-
-         if (printed < count) then
-            write(*, '(a)', advance='no') " -> "
-            call this%print_remaining(count, this%next_index(idx), printed)
-         else
-            write(*, *)
-         end if
+         idx = this%current
+         printed = 0
+         
+         do while (printed < count)
+            if (this%nodes(idx)%active) then
+               write(*, '(a)', advance='no') trim(this%nodes(idx)%name)
+               printed = printed + 1
+               if (printed < count) then
+                  write(*, '(a)', advance='no') " -> "
+               end if
+            end if
+            idx = this%next_index(idx)
+         end do
+         
+         write(*, *)
       end if
    end subroutine print_remaining
 
    ! Печать полного списка участников
-   recursive subroutine print_full_list(this, idx, printed)
+   subroutine print_full_list(this)
       class(CircularList), intent(in) :: this
-      integer, intent(in) :: idx
-      integer, intent(inout) :: printed
+      integer :: idx
 
-      if (printed < this%size) then
-         if (printed == 0) then
-            write(*, '(a, i0, a)') "Все участники (", this%size, "):"
-            write(*, '(a)', advance='no') "  "
-         end if
+      if (this%size == 0) then
+         write(*, '(a)') "Список пуст"
+      else
+         write(*, '(a, i0, a)') "Все участники (", this%size, "):"
+         write(*, '(a)', advance='no') "  "
 
-         write(*, '(a)', advance='no') this%nodes(idx)%name
-         printed = printed + 1
-
-         if (printed < this%size) then
-            write(*, '(a)', advance='no') " -> "
-            call this%print_full_list(idx + 1, printed)
-         else
-            write(*, *)
-            write(*, *)
-         end if
+         do idx = 1, this%size
+            write(*, '(a)', advance='no') trim(this%nodes(idx)%name)
+            if (idx < this%size) then
+               write(*, '(a)', advance='no') " -> "
+            else
+               write(*, *)
+               write(*, *)
+            end if
+         end do
       end if
    end subroutine print_full_list
 
@@ -199,7 +216,8 @@ contains
       class(CircularList), intent(inout) :: this
       character(*), intent(in) :: start_name
       integer, intent(in) :: m
-      integer :: remaining, i, printed, idx
+      integer :: remaining, i, idx
+      logical :: game_over
 
       if (this%size == 0) then
          write(*, '(a)') "Нет участников!"
@@ -207,50 +225,59 @@ contains
          write(*, '(a)') "Ошибка: m >= 1!"
       else
          ! Вывод полного списка
-         printed = 0
-         call this%print_full_list(1, printed)
+         call this%print_full_list()
 
          call this%find_starting_node(start_name)
 
-         remaining = this%size
-         write(*, '(a,a)') "Начало игры с: ", start_name
-         write(*, '(a,i0)') "Шаг счета: ", m
-         write(*, *)
+         if (this%current /= 0) then
+            remaining = this%size
+            write(*, '(a,a)') "Начало игры с: ", start_name
+            write(*, '(a,i0)') "Шаг счета: ", m
+            write(*, *)
 
-         do while (remaining > 1)
-            idx = this%current
+            game_over = .false.
+            do while (.not. game_over)
+               if (remaining <= 1) then
+                  game_over = .true.
+               else
+                  idx = this%current
 
-            ! Отсчитываем m-1 шагов
-            do i = 1, m - 1
-               idx = this%next_index(idx)
+                  ! Отсчитываем m-1 шагов
+                  i = 1
+                  do while (i <= m - 1)
+                     idx = this%next_index(idx)
+                     i = i + 1
+                  end do
+
+                  this%current = idx
+                  call this%remove_current(remaining)
+
+                  call this%print_remaining(remaining)
+                  write(*, *)
+               end if
             end do
 
-            this%current = idx
-            call this%remove_current(remaining)
-
-            if (remaining > 0) then
-               printed = 0
-               call this%print_remaining(remaining, this%current, printed)
+            if (this%current > 0) then
+               write(*, '(a)') "Последний оставшийся участник:"
+               write(*, '(2x,a)') this%nodes(this%current)%name
                write(*, *)
             end if
-         end do
-
-         write(*, '(a)') "Последний оставшийся участник:"
-         write(*, '(2x,a)') this%nodes(this%current)%name
-         write(*, *)
+         else
+            write(*, '(a)') "Нет активных узлов!"
+         end if
       end if
    end subroutine play_game
 
    subroutine output_result(this, output_file)
       class(CircularList), intent(in) :: this
       character(*), intent(in) :: output_file
-      integer :: Out
+      integer :: Out, IO
 
-      open(file=output_file, newunit=Out, action='write', iostat=Out)
-      if (Out == 0) then
+      open(file=output_file, newunit=Out, action='write', iostat=IO)
+      if (IO == 0) then
          write(Out, '(a)') "Результат игры в считалку:"
          write(Out, '(a)') ""
-         if (this%current > 0) then
+         if (this%current > 0 .and. allocated(this%nodes)) then
             write(Out, '(a)') "Победитель:"
             write(Out, '(2x,a)') this%nodes(this%current)%name
             write(Out, '(a,i0)') "Всего участников было: ", this%size

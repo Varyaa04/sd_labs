@@ -1,4 +1,4 @@
-﻿!mod$ v1 sum:83fe8592c7534c3d
+﻿!mod$ v1 sum:5907a884d89cc2a8
 !need$ 5cbba2cdaa980ab0 n environment
 module circularlist
 use environment,only:event_type
@@ -133,25 +133,20 @@ subroutine read_names(this,input_file)
 class(circularlist),intent(inout)::this
 character(*,1),intent(in)::input_file
 end
-recursive subroutine find_starting_node(this,start_name,idx)
+subroutine find_starting_node(this,start_name)
 class(circularlist),intent(inout)::this
 character(*,1),intent(in)::start_name
-integer(4),intent(in),optional::idx
 end
 subroutine remove_current(this,remaining)
 class(circularlist),intent(inout)::this
 integer(4),intent(inout)::remaining
 end
-recursive subroutine print_remaining(this,count,idx,printed)
+subroutine print_remaining(this,count)
 class(circularlist),intent(in)::this
 integer(4),intent(in)::count
-integer(4),intent(in)::idx
-integer(4),intent(inout)::printed
 end
-recursive subroutine print_full_list(this,idx,printed)
+subroutine print_full_list(this)
 class(circularlist),intent(in)::this
-integer(4),intent(in)::idx
-integer(4),intent(inout)::printed
 end
 subroutine play_game(this,start_name,m)
 class(circularlist),intent(inout)::this
