@@ -145,13 +145,11 @@ contains
       class(StringList), intent(inout) :: this
       integer :: deleted_count
 
-      if (.not. allocated(this%head)) return
-      if (.not. allocated(this%last_line_to_delete)) return
-      if (len_trim(this%last_line_to_delete) == 0) return
-
-      deleted_count = 0
-      call this%delete_all_recursive(this%head, deleted_count)
-      this%list_size = this%list_size - deleted_count
+      if (allocated(this%head) .and. allocated(this%last_line_to_delete) .and. len_trim(this%last_line_to_delete) /= 0) then
+         deleted_count = 0
+         call this%delete_all_recursive(this%head, deleted_count)
+         this%list_size = this%list_size - deleted_count
+      end if
    end subroutine delete_all
 
    !рекурсивное удаление узлов 
